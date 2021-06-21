@@ -11,13 +11,16 @@ slash = SlashCommand(client, sync_commands=True, sync_on_cog_reload=True)
 
 @client.event
 async def on_ready():
+    for filename in os.listdir("cogs"):
+        if filename.endswith(".py"):
+            client.reload_extension(f"cogs.{filename[:-3]}")
     await client.change_presence(status=discord.Status.online,activity=discord.Game("Cỏ"))
-
     print("Bot is ready")
 
 @client.command()
 async def ping(ctx):
-  await ctx.reply(f"Ping: {round(client.latency*1000)} ms",mention_author=False)
+    print(ctx.guild.id)
+    await ctx.reply(f"Ping: {round(client.latency*1000)} ms",mention_author=False)
 
 
 @client.command()
@@ -40,4 +43,4 @@ for filename in os.listdir("cogs"):
     if filename.endswith(".py"):
         client.load_extension(f"cogs.{filename[:-3]}")
 
-client.run(os.getenv("TOKEN"))
+client.run("TOKEN")
