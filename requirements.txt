@@ -1,4 +1,6 @@
-git+https://github.com/Crazylov3/Discord_bot.git
+PyNaCl
+dnspython
+async-timeout==3.0.1
 python-dotenv
 discord
 youtube_dl
@@ -6,3 +8,4 @@ discord-py-slash-command
 asyncio
 typing
 datetime
+

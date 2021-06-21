@@ -364,6 +364,7 @@ class Music(commands.Cog):
         else:
             await ctx.send(embed=discord.Embed(title="⏭ | Skipped"))
 
+    # @cog_ext.cog_slash(name="queue", description="Show the queue")
     @commands.command()
     async def queue(self, ctx):
         def _check(r, u):
