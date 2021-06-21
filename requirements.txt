@@ -1,1 +1,8 @@
-numpy
+git+https://github.com/Crazylov3/Discord_bot
+python-dotenv
+discord
+youtube_dl
+discord-py-slash-command
+asyncio
+typing
+datetime
