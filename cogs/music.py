@@ -173,11 +173,15 @@ class Music(commands.Cog):
 
     def get_embed(self, ctx, lis_song, state, type="Up Comming"):
         song = self.queue.current_song(ctx)
-        embed = discord.Embed(title="Now Playing:",
-                              description=f"🎶 {song['title'][:70]}" + \
-                                          ("..." if len(song['title'][70:]) else "") + \
-                                          f"`{song['duration'] // 60}:{song['duration'] % 60} `\n",
-                              colour=ctx.author.colour)
+        if self.voice[ctx.guild.id].is_playing():
+            embed = discord.Embed(title="Now Playing:",
+                                  description=f"🎶 *{self.queue.get_position(ctx)}*. {song['title'][:70]}" + \
+                                              ("..." if len(song['title'][70:]) else "") + \
+                                              f"`{song['duration'] // 60}:{song['duration'] % 60} `\n",
+                                  colour=ctx.author.colour)
+        else:
+            embed = discord.Embed(title="`/play + url` to play the song",
+                                  colour=ctx.author.colour)
         value = "."
         count = 0
         for index in range(state[0], state[1]):
@@ -409,7 +413,11 @@ class Music(commands.Cog):
             else:
                 source = discord.PCMVolumeTransformer(
                     discord.FFmpegPCMAudio(self.queue.current_song(ctx)['url'], **Music.FFMPEG_OPTIONS))
-                ctx.voice_client.play(source, after=lambda e: self.play_next_song(ctx, ctx.voice_client))
+                self.voice[ctx.guild.id].play(source, after=lambda e: self.play_next_song(ctx, self.voice[ctx.guild.id]))
+                await ctx.send(embed=self.get_embed(ctx, self.queue.get_queue(ctx),
+                                                    [self.queue.get_position(ctx) + 1,
+                                                     min(self.queue.length(ctx), self.queue.get_position(ctx) + 6)])
+                               , delete_after=self.queue.current_song(ctx)['duration'])
 
         else:
             await ctx.send(embed=discord.Embed(
@@ -564,16 +572,16 @@ class Music(commands.Cog):
             self.queue.position[ctx.guild.id] -= 1
             self.voice[ctx.guild.id].stop()
 
-    @cog_ext.cog_slash(name="lqueue", description="Show the list of saved queue")
-    async def lqueue(self, ctx):
+    @cog_ext.cog_slash(name="lstqueue", description="Show the list of saved queue")
+    async def lstqueue(self, ctx):
         lis = []
         if os.path.exists(f"list_queue/{ctx.guild.id}"):
             for filename in os.listdir(f"list_queue/{ctx.guild.id}"):
-                if filename.endswith(".text"):
+                if filename.endswith(".txt"):
                     lis.append(filename[:-4])
             await ctx.send(embed=discord.Embed(
-                title="List of saved queue",
-                description="\n".join([f"{name}" for name in lis])
+                title="List of saved queue: ",
+                description="\n".join([f"+, {name}" for name in lis])
             ))
         else:
             await ctx.send(embed=discord.Embed(
