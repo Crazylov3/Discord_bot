@@ -175,7 +175,7 @@ class Music(commands.Cog):
         song = self.queue.current_song(ctx)
         if self.voice[ctx.guild.id].is_playing():
             embed = discord.Embed(title="Now Playing:",
-                                  description=f"🎶 *{self.queue.get_position(ctx)}*. {song['title'][:70]}" + \
+                                  description=f"🎶 *{self.queue.get_position(ctx)+1}*. {song['title'][:70]}" + \
                                               ("..." if len(song['title'][70:]) else "") + \
                                               f"`{song['duration'] // 60}:{song['duration'] % 60} `\n",
                                   colour=ctx.author.colour)
