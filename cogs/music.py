@@ -4,7 +4,7 @@ import random
 import re
 import typing as t
 from enum import Enum
-
+import os
 import discord
 from discord.ext import commands
 from discord_slash import cog_ext
@@ -50,7 +50,8 @@ class Queue:
                 self._queue[guild_id] = []
                 self.position[guild_id] = 0
                 self.repeat_mode[guild_id] = RepeatMode.NONE
-    def add_guild(self,*args):
+
+    def add_guild(self, *args):
         for guild in args:
             if guild.id not in self.list_guild_id:
                 self.list_guild_id.append(guild.id)
@@ -60,6 +61,11 @@ class Queue:
 
     def get_queue(self, ctx):
         return self._queue[ctx.guild.id]
+
+    def set_queue(self, ctx, queue):
+        self._queue[ctx.guild.id] = queue
+        self.position[ctx.guild.id] = 0
+        self.repeat_mode[ctx.guild_id] = RepeatMode.NONE
 
     def get_position(self, ctx):
         return self.position[ctx.guild.id]
@@ -140,15 +146,15 @@ class Music(commands.Cog):
         for guild_id in [guild.id for guild in client.guilds]:
             if guild_id not in self.voice.keys():
                 self.voice[guild_id] = None
+
     @commands.Cog.listener()
-    async def on_guild_join(self,guild):
+    async def on_guild_join(self, guild):
         general = discord.utils.find(lambda x: x.name == 'general', guild.text_channels)
         if general and general.permissions_for(guild.me).send_messages:
-            await general.send(embed = discord.Embed(title="Hello everyone, I'm MeozMeoz"))
+            await general.send(embed=discord.Embed(title="Hello everyone, I'm MeozMeoz"))
         if guild.id not in self.voice.keys():
             self.voice[guild.id] = None
         self.queue.add_guild(guild)
-
 
     def play_next_song(self, ctx, voice):
         next_song = self.queue.get_next_song(ctx)
@@ -226,7 +232,7 @@ class Music(commands.Cog):
     async def play(self, ctx, *, input: t.Optional[str]):
         if ctx.author.voice is None:
             await ctx.message.delete()
-            await ctx.send(embed=discord.Embed(title="🚫 | You must join voice channel first"),delete_after=10)
+            await ctx.send(embed=discord.Embed(title="🚫 | You must join voice channel first"), delete_after=10)
             return
         else:
             try:
@@ -237,13 +243,13 @@ class Music(commands.Cog):
         self.voice[ctx.guild.id] = ctx.voice_client
         if re.match(URL_REGEX, input):
             YDL_OPTIONS = {'format': 'bestaudio',
-                          'verbose': True, "quiet": True,"geo-bypass":True
+                           'verbose': True, "quiet": True, "geo-bypass": True
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(input, download=False)
         else:
             YDL_OPTIONS = {'format': 'bestaudio', "ytsearch": "--default-search",
-                          'verbose': True, "quiet": True,"geo-bypass":True
+                           'verbose': True, "quiet": True, "geo-bypass": True
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 _info = ydl.extract_info(f"ytsearch5:{input}", download=False)
@@ -283,7 +289,9 @@ class Music(commands.Cog):
     @cog_ext.cog_slash(name="pause", description="Pause playing")
     async def pause(self, ctx):
         if self.voice[ctx.guild.id] is None:
-            return
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
         else:
             self.voice[ctx.guild.id].pause()
             await ctx.send(embed=discord.Embed(
@@ -293,7 +301,9 @@ class Music(commands.Cog):
     @cog_ext.cog_slash(name="resume", description="Resume playing")
     async def resume(self, ctx):
         if self.voice[ctx.guild.id] is None:
-            return
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
         else:
             self.voice[ctx.guild.id].resume()
             await ctx.send(embed=discord.Embed(
@@ -311,6 +321,9 @@ class Music(commands.Cog):
     @commands.command()
     async def volume(self, ctx, value: int):
         if self.voice[ctx.guild.id] is None:
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
             return
         else:
             vol = max(0, value if value < 100 else 100)
@@ -356,7 +369,7 @@ class Music(commands.Cog):
             title = self.queue.get_queue(ctx)[value]['title']
             if self.queue.get_position(ctx) > value:
                 self.queue.position[ctx.guild.id] -= 1
-            e = self.queue.get_queue(ctx).pop(value) if self.queue.get_position(ctx) != (value-1)else None
+            e = self.queue.get_queue(ctx).pop(value) if self.queue.get_position(ctx) != (value - 1) else None
             if e is None:
                 await ctx.send(embed=discord.Embed(title="This song is playing"), delete_after=60)
                 return
@@ -382,16 +395,21 @@ class Music(commands.Cog):
                 title='🚫 | The command is not available at this time.'
             ), delete_after=10)
             return
-        elif value > 0 and value <= self.queue.length(ctx) :
+        elif value > 0 and value <= self.queue.length(ctx):
             self.queue.position[ctx.guild.id] = value - 2
-            self.voice[ctx.guild.id].stop()
-            await ctx.send(embed=self.get_embed(ctx, self.queue.get_queue(ctx), [(value), self.queue.length(ctx)]),
-                           delete_after=self.queue.current_song(ctx)['duration'])
+            if self.voice[ctx.guild.id].is_playing():
+                self.voice[ctx.guild.id].stop()
+                await ctx.send(embed=self.get_embed(ctx, self.queue.get_queue(ctx), [(value), self.queue.length(ctx)]),
+                               delete_after=self.queue.current_song(ctx)['duration'])
+            else:
+                source = discord.PCMVolumeTransformer(
+                    discord.FFmpegPCMAudio(self.queue.current_song(ctx)['url'], **Music.FFMPEG_OPTIONS))
+                ctx.voice_client.play(source, after=lambda e: self.play_next_song(ctx, ctx.voice_client))
+
         else:
             await ctx.send(embed=discord.Embed(
                 title='🚫 | Invalid index.'
             ), delete_after=10)
-
 
     @cog_ext.cog_slash(name="shuffle", description="shuffle the queue")
     async def shuffle(self, ctx):
@@ -465,6 +483,94 @@ class Music(commands.Cog):
                 await msg.add_reaction(name)
             reaction, _ = await self.client.wait_for("reaction_add", timeout=600.0, check=_check)
             await msg.edit(embed=self.get_embed(ctx, queue, window_state[OPTIONS[reaction.emoji]], "Playlist :"))
+
+    @cog_ext.cog_slash(
+        name="savequeue",
+        description="save the current queue",
+        options=[
+            create_option(
+                name="name",
+                description="Name the playlist you want to save",
+                option_type=3,
+                required=True
+            )
+        ]
+    )
+    async def savequeue(self, ctx, name: str):
+        dirName = f"list_queue/{ctx.guild.id}"
+        txtName = f"list_queue/{ctx.guild.id}/{name.lower()}.txt"
+        info = {"Author": ctx.author.display_name, "Date created": dt.datetime.utcnow()}
+        if not os.path.exists(dirName):
+            os.makedirs(dirName)
+        if os.path.exists(txtName):
+            await ctx.send(embed=discord.Embed(
+                title="🚫 | This name has already been given, please choose another name!"
+            ),delete_after=30)
+        else:
+            with open(txtName, "w+", encoding="utf-8") as file:
+                for key in ["Author", "Date created"]:
+                    file.write(key + ":*:" + str(info[key]) + "\n")
+                for song in self.queue.get_queue(ctx):
+                    file.write(song["title"] + ":*:" + str(song["duration"]) + ":*:" + song["url"] + "\n")
+                file.close()
+            embed = discord.Embed(
+                title="Saved current queue",
+                colour=discord.colour.Colour.blue(),
+                timestamp=dt.datetime.utcnow()
+            )
+            embed.set_footer(text=f"Invoked by {ctx.author.display_name}", icon_url=ctx.author.avatar_url)
+            await ctx.send(embed=embed, delete_after=60)
+
+    @cog_ext.cog_slash(
+        name="loadqueue",
+        description="Load the saved queue",
+        options=[
+            create_option(
+                name="queuename",
+                description="Name the playlist",
+                option_type=3,
+                required=True
+            )
+        ]
+    )
+    async def loadqueue(self, ctx, name: str):
+        txtName = f"list_queue/{ctx.guild.id}/{name.lower()}.txt"
+        if not os.path.exists(txtName):
+            await ctx.send(embed=discord.Embed(
+                title="🚫 | Invaild name of queue!"
+            ),delete_after=30)
+        else:
+            await ctx.send(embed=discord.Embed(
+                title="✅ | Successfully load the queue!"
+            ), delete_after=30)
+            queue = []
+            info = {}
+            with open(txtName, "r", encoding="utf-8") as file:
+                for i, line in enumerate(file):
+                    if i < 2:
+                        info[line.rstrip().split(":*:")[0]] = line.rstrip().split(":*:")[1]
+                    else:
+                        song = line.rstrip().split(":*:")
+                        queue.append({"title": song[0], "duration": int(song[1]), "url": song[2]})
+            self.queue.set_queue(ctx, queue)
+            self.queue.position[ctx.guild.id] -= 1
+            self.voice[ctx.guild.id].stop()
+    @cog_ext.cog_slash(name="lqueue", description="Show the list of saved queue")
+    async def lqueue(self,ctx):
+        lis = []
+        if os.path.exists(f"list_queue/{ctx.guild.id}"):
+            for filename in os.listdir(f"list_queue/{ctx.guild.id}"):
+                if filename.endswith(".text"):
+                    lis.append(filename[:-4])
+            await ctx.send(embed = discord.Embed(
+                title="List of saved queue",
+                description="\n".join(f"{name}" for name in lis)
+            ))
+        else:
+            await ctx.send(embed=discord.Embed(
+                title="You haven't saved any queue yet!",
+            ))
+
 
 
 def setup(client):
