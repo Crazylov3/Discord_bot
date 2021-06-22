@@ -237,13 +237,13 @@ class Music(commands.Cog):
         self.voice[ctx.guild.id] = ctx.voice_client
         if re.match(URL_REGEX, input):
             YDL_OPTIONS = {'format': 'bestaudio',
-                          'verbose': True, "quiet": True
+                          'verbose': True, "quiet": True,"geo-bypass":True
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(input, download=False)
         else:
             YDL_OPTIONS = {'format': 'bestaudio', "ytsearch": "--default-search",
-                          'verbose': True, "quiet": True
+                          'verbose': True, "quiet": True,"geo-bypass":True
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 _info = ydl.extract_info(f"ytsearch5:{input}", download=False)
