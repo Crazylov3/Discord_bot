@@ -40,8 +40,8 @@ class RepeatMode(Enum):
 
 
 class Queue:
-    def __init__(self, list_guild_id):
-        self.list_guild_id = list_guild_id
+    def __init__(self, args):
+        self.list_guild_id = args
         self._queue = {}
         self.position = {}
         self.repeat_mode = {}
@@ -50,6 +50,13 @@ class Queue:
                 self._queue[guild_id] = []
                 self.position[guild_id] = 0
                 self.repeat_mode[guild_id] = RepeatMode.NONE
+    def add_guild(self,*args):
+        for guild in args:
+            if guild.id not in self.list_guild_id:
+                self.list_guild_id.append(guild.id)
+                self._queue[guild.id] = []
+                self.position[guild.id] = 0
+                self.repeat_mode[guild.id] = RepeatMode.NONE
 
     def get_queue(self, ctx):
         return self._queue[ctx.guild.id]
@@ -133,6 +140,15 @@ class Music(commands.Cog):
         for guild_id in [guild.id for guild in client.guilds]:
             if guild_id not in self.voice.keys():
                 self.voice[guild_id] = None
+    @commands.Cog.listener()
+    async def on_guild_join(self,guild):
+        general = discord.utils.find(lambda x: x.name == 'general', guild.text_channels)
+        if general and general.permissions_for(guild.me).send_messages:
+            await general.send(embed = discord.Embed(title="Hello everyone, I'm MeozMeoz"))
+        if guild.id not in self.voice.keys():
+            self.voice[guild.id] = None
+        self.queue.add_guild(guild)
+
 
     def play_next_song(self, ctx, voice):
         next_song = self.queue.get_next_song(ctx)
@@ -217,16 +233,14 @@ class Music(commands.Cog):
             await channel.connect()
         self.voice[ctx.guild.id] = ctx.voice_client
         if re.match(URL_REGEX, input):
-            YDL_OPTIONS = {'format': 'bestaudio', 'skip_download': True,
-                           'ratelimit': 'infinity', 'skip_unavailable_fragments': True, "simulate": True,
-                           'verbose': True, "ignore-errors": True}
+            YDL_OPTIONS = {'format': 'bestaudio',
+                          'verbose': True, "quiet": True
+                           }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(input, download=False)
         else:
             YDL_OPTIONS = {'format': 'bestaudio', "ytsearch": "--default-search",
-                           'skip_download': True,
-                           'ratelimit': 'infinity', 'skip_unavailable_fragments': True, "simulate": True,
-                           'verbose': True, "ignore-errors": True
+                          'verbose': True, "quiet": True
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 _info = ydl.extract_info(f"ytsearch5:{input}", download=False)
@@ -339,7 +353,7 @@ class Music(commands.Cog):
             title = self.queue.get_queue(ctx)[value]['title']
             if self.queue.get_position(ctx) > value:
                 self.queue.position[ctx.guild.id] -= 1
-            e = self.queue.get_queue(ctx).pop(value) if self.queue.get_position(ctx) != (value-1) else None
+            e = self.queue.get_queue(ctx).pop(value) if self.queue.get_position(ctx) != (value-1)else None
             if e is None:
                 await ctx.send(embed=discord.Embed(title="This song is playing"), delete_after=60)
                 return
