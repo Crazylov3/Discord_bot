@@ -273,7 +273,8 @@ class Music(commands.Cog):
                 discord.FFmpegPCMAudio(self.queue.current_song(ctx)['url'], **Music.FFMPEG_OPTIONS))
             ctx.voice_client.play(source, after=lambda e: self.play_next_song(ctx, ctx.voice_client))
             await ctx.send(embed=self.get_embed(ctx, self.queue.get_queue(ctx),
-                                                [self.queue.get_position(ctx) + 1, self.queue.length(ctx)])
+                                                [self.queue.get_position(ctx) + 1,
+                                                 min(self.queue.length(ctx), self.queue.get_position(ctx) + 6)])
                            , delete_after=self.queue.current_song(ctx)['duration'])
         else:
             embed = discord.Embed(
@@ -344,11 +345,15 @@ class Music(commands.Cog):
                 title='🚫 | The command is not available at this time.'
             ), delete_after=10)
             return
-        else:
+        elif self.voice[ctx.guild.id].is_playing():
             self.queue.clear_queue(ctx)
             self.voice[ctx.guild.id].stop()
             await ctx.send(embed=discord.Embed(
                 title='⏹ | Stopped.'
+            ), delete_after=60)
+        else:
+            await ctx.send(embed=discord.Embed(
+                title="⏹ | The music haven't played yet!"
             ), delete_after=60)
 
     @cog_ext.cog_slash(name="remove", description="remove a song from queue", options=[
@@ -505,7 +510,7 @@ class Music(commands.Cog):
         if os.path.exists(txtName):
             await ctx.send(embed=discord.Embed(
                 title="🚫 | This name has already been given, please choose another name!"
-            ),delete_after=30)
+            ), delete_after=30)
         else:
             with open(txtName, "w+", encoding="utf-8") as file:
                 for key in ["Author", "Date created"]:
@@ -538,11 +543,9 @@ class Music(commands.Cog):
         if not os.path.exists(txtName):
             await ctx.send(embed=discord.Embed(
                 title="🚫 | Invaild name of queue!"
-            ),delete_after=30)
-        else:
-            await ctx.send(embed=discord.Embed(
-                title="✅ | Successfully load the queue!"
             ), delete_after=30)
+        else:
+
             queue = []
             info = {}
             with open(txtName, "r", encoding="utf-8") as file:
@@ -552,25 +555,30 @@ class Music(commands.Cog):
                     else:
                         song = line.rstrip().split(":*:")
                         queue.append({"title": song[0], "duration": int(song[1]), "url": song[2]})
+            embed = discord.Embed(
+                title=f"✅ | Successfully load the `{name}`!",
+                description=f"Playlist Author: `{info['Author']}`\nDate created: {info['Date created']}"
+            )
+            await ctx.send(embed=embed, delete_after=30)
             self.queue.set_queue(ctx, queue)
             self.queue.position[ctx.guild.id] -= 1
             self.voice[ctx.guild.id].stop()
+
     @cog_ext.cog_slash(name="lqueue", description="Show the list of saved queue")
-    async def lqueue(self,ctx):
+    async def lqueue(self, ctx):
         lis = []
         if os.path.exists(f"list_queue/{ctx.guild.id}"):
             for filename in os.listdir(f"list_queue/{ctx.guild.id}"):
                 if filename.endswith(".text"):
                     lis.append(filename[:-4])
-            await ctx.send(embed = discord.Embed(
+            await ctx.send(embed=discord.Embed(
                 title="List of saved queue",
-                description="\n".join(f"{name}" for name in lis)
+                description="\n".join([f"{name}" for name in lis])
             ))
         else:
             await ctx.send(embed=discord.Embed(
                 title="You haven't saved any queue yet!",
             ))
-
 
 
 def setup(client):
