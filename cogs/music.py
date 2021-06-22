@@ -217,11 +217,17 @@ class Music(commands.Cog):
             await channel.connect()
         self.voice[ctx.guild.id] = ctx.voice_client
         if re.match(URL_REGEX, input):
-            YDL_OPTIONS = {'format': 'bestaudio'}
+            YDL_OPTIONS = {'format': 'bestaudio', 'skip_download': True,
+                           'ratelimit': 'infinity', 'skip_unavailable_fragments': True, "simulate": True,
+                           'verbose': True, "ignore-errors": True}
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(input, download=False)
         else:
-            YDL_OPTIONS = {'format': 'bestaudio', "ytsearch": "--default-search"}
+            YDL_OPTIONS = {'format': 'bestaudio', "ytsearch": "--default-search",
+                           'skip_download': True,
+                           'ratelimit': 'infinity', 'skip_unavailable_fragments': True, "simulate": True,
+                           'verbose': True, "ignore-errors": True
+                           }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 _info = ydl.extract_info(f"ytsearch5:{input}", download=False)
                 info = await self.choose_song(ctx, _info)
@@ -304,6 +310,9 @@ class Music(commands.Cog):
     @cog_ext.cog_slash(name="stop", description="Destroy the playing")
     async def stop(self, ctx):
         if self.voice[ctx.guild.id] is None:
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
             return
         else:
             self.queue.clear_queue(ctx)
@@ -321,16 +330,26 @@ class Music(commands.Cog):
         )
     ])
     async def remove(self, ctx, value):
-        title = self.queue.get_queue(ctx)[value]['title']
-        if self.queue.get_position(ctx) > value:
-            self.queue.position[ctx.guild.id] -= 1
-        e = self.queue.get_queue(ctx).pop(value) if self.queue.get_position(ctx) != value else None
-        if e is None:
-            await ctx.send(embed=discord.Embed(title="This song is playing"), delete_after=60)
+        if self.voice[ctx.guild.id] is None:
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
             return
-        await ctx.send(embed=discord.Embed(
-            title=f"✅ | Removed **  {title}  ** from the queue."
-        ), delete_after=60)
+        elif value > 0 and value <= self.queue.length(ctx):
+            title = self.queue.get_queue(ctx)[value]['title']
+            if self.queue.get_position(ctx) > value:
+                self.queue.position[ctx.guild.id] -= 1
+            e = self.queue.get_queue(ctx).pop(value) if self.queue.get_position(ctx) != (value-1) else None
+            if e is None:
+                await ctx.send(embed=discord.Embed(title="This song is playing"), delete_after=60)
+                return
+            await ctx.send(embed=discord.Embed(
+                title=f"✅ | Removed **  {title}  ** from the queue."
+            ), delete_after=60)
+        else:
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | Invalid index.'
+            ), delete_after=10)
 
     @cog_ext.cog_slash(name="jump", description="jump into a song on the queue", options=[
         create_option(
@@ -342,12 +361,20 @@ class Music(commands.Cog):
     ])
     async def jump(self, ctx, value):
         if self.voice[ctx.guild.id] is None:
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
             return
-        else:
+        elif value > 0 and value <= self.queue.length(ctx) :
             self.queue.position[ctx.guild.id] = value - 2
             self.voice[ctx.guild.id].stop()
             await ctx.send(embed=self.get_embed(ctx, self.queue.get_queue(ctx), [(value), self.queue.length(ctx)]),
                            delete_after=self.queue.current_song(ctx)['duration'])
+        else:
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | Invalid index.'
+            ), delete_after=10)
+
 
     @cog_ext.cog_slash(name="shuffle", description="shuffle the queue")
     async def shuffle(self, ctx):
@@ -368,13 +395,20 @@ class Music(commands.Cog):
         )
     ])
     async def loop(self, ctx, mode: str):
+        if self.voice[ctx.guild.id] is None:
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
+            return
         self.queue.set_repeat_mode(ctx, mode)
         await ctx.send(embed=discord.Embed(title=f"🔂 | Loop mode set to {mode}"), delete_after=60)
 
     @cog_ext.cog_slash(name="skip", description="skip current song")
     async def skip(self, ctx):
         if self.voice[ctx.guild.id] is None:
-            print("skip")
+            await ctx.send(embed=discord.Embed(
+                title='🚫 | The command is not available at this time.'
+            ), delete_after=10)
             return
         else:
             self.voice[ctx.guild.id].stop()
