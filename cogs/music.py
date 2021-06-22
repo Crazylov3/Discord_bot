@@ -229,8 +229,11 @@ class Music(commands.Cog):
             await ctx.send(embed=discord.Embed(title="🚫 | You must join voice channel first"),delete_after=10)
             return
         else:
-            channel = ctx.author.voice.channel
-            await channel.connect()
+            try:
+                channel = ctx.author.voice.channel
+                await channel.connect()
+            except:
+                pass
         self.voice[ctx.guild.id] = ctx.voice_client
         if re.match(URL_REGEX, input):
             YDL_OPTIONS = {'format': 'bestaudio',
