@@ -133,8 +133,6 @@ class Queue:
         self._queue[ctx.guild.id].clear()
         self.position[ctx.guild.id] = 0
 
-
-# noinspection PyTypeChecker
 class Music(commands.Cog):
     FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
                       'options': '-vn'}
@@ -405,12 +403,13 @@ class Music(commands.Cog):
             ), delete_after=10)
             return
         elif value > 0 and value <= self.queue.length(ctx):
-            self.queue.position[ctx.guild.id] = value - 2
             if self.voice[ctx.guild.id].is_playing():
+                self.queue.position[ctx.guild.id] = value - 2
                 self.voice[ctx.guild.id].stop()
                 await ctx.send(embed=self.get_embed(ctx, self.queue.get_queue(ctx), [(value), self.queue.length(ctx)]),
                                delete_after=self.queue.current_song(ctx)['duration'])
             else:
+                self.queue.position[ctx.guild.id] = value - 1
                 source = discord.PCMVolumeTransformer(
                     discord.FFmpegPCMAudio(self.queue.current_song(ctx)['url'], **Music.FFMPEG_OPTIONS))
                 self.voice[ctx.guild.id].play(source, after=lambda e: self.play_next_song(ctx, self.voice[ctx.guild.id]))
