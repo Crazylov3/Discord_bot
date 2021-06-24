@@ -51,6 +51,10 @@ class Queue:
                 self.position[guild_id] = 0
                 self.repeat_mode[guild_id] = RepeatMode.NONE
 
+    def is_empty(self,ctx):
+        return  not self._queue[ctx.guild.id]
+
+
     def add_guild(self, *args):
         for guild in args:
             if guild.id not in self.list_guild_id:
@@ -97,7 +101,7 @@ class Queue:
 
     def get_next_song(self, ctx):
         if not self._queue[ctx.guild.id]:
-            raise QueueIsEmpty
+            return None
         if self.repeat_mode[ctx.guild.id] == RepeatMode.ONE:
             return self._queue[ctx.guild.id][self.position[ctx.guild.id]]
         self.position[ctx.guild.id] += 1
@@ -157,17 +161,24 @@ class Music(commands.Cog):
     def play_next_song(self, ctx, voice):
         next_song = self.queue.get_next_song(ctx)
         if next_song is not None:
-            source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(next_song['url'], **Music.FFMPEG_OPTIONS))
-            voice.play(source, after=lambda e: self.play_next_song(ctx, voice))
-            coro = ctx.send(
-                embed=self.get_embed(ctx, self.queue.get_queue(ctx),
-                                     [self.queue.get_position(ctx) + 1, self.queue.length(ctx)]),
-                delete_after=self.queue.current_song(ctx)['duration'])
-            fut = asyncio.run_coroutine_threadsafe(coro, self.client.loop)
             try:
-                fut.result()
+                source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(next_song['url'], **Music.FFMPEG_OPTIONS))
+                voice.play(source, after=lambda e: self.play_next_song(ctx, voice))
+                coro = ctx.send(
+                    embed=self.get_embed(ctx, self.queue.get_queue(ctx),
+                                         [self.queue.get_position(ctx) + 1,
+                                          min(self.queue.get_position(ctx) + 6, self.queue.length(ctx))]),
+                    delete_after=self.queue.current_song(ctx)['duration'])
+                fut = asyncio.run_coroutine_threadsafe(coro, self.client.loop)
+                try:
+                    fut.result()
+                except:
+                    pass
             except:
-                pass
+                self.remove(ctx, self.queue.get_position(ctx))
+                if self.queue.is_empty(ctx):
+                    return
+                self.play_next_song(ctx,voice)
 
     def get_embed(self, ctx, lis_song, state, type="Up Comming"):
         song = self.queue.current_song(ctx)
@@ -223,6 +234,20 @@ class Music(commands.Cog):
             await ctx.message.delete()
             return info['entries'][OPTIONS[_reaction.emoji]]
 
+    @commands.command()
+    async def connect(self,ctx):
+        if ctx.author.voice is None:
+            await ctx.message.delete()
+            await ctx.send(embed=discord.Embed(title="🚫 | You must join voice channel first"), delete_after=30)
+            return
+        else:
+            try:
+                channel = ctx.author.voice.channel
+                await channel.connect()
+                self.voice[ctx.guild.id] = ctx.voice_client
+            except:
+                pass
+
     # @cog_ext.cog_slash(name="play", description="Play a song given by a url", options=[
     #     create_option(
     #         name="input",
@@ -232,17 +257,8 @@ class Music(commands.Cog):
     #     )])
     @commands.command()
     async def play(self, ctx, *, input: t.Optional[str]):
-        if ctx.author.voice is None:
-            await ctx.message.delete()
-            await ctx.send(embed=discord.Embed(title="🚫 | You must join voice channel first"), delete_after=10)
-            return
-        else:
-            try:
-                channel = ctx.author.voice.channel
-                await channel.connect()
-            except:
-                pass
-        self.voice[ctx.guild.id] = ctx.voice_client
+        await self.connect(ctx)
+
         if re.match(URL_REGEX, input):
             YDL_OPTIONS = {'format': 'bestaudio',
                            'verbose': True, "quiet": True, "geo-bypass": True
@@ -269,7 +285,7 @@ class Music(commands.Cog):
                           ("..." if len(info['title'][70:]) else "") + \
                           f"`{info['duration'] // 60}:{info['duration'] % 60}`\n"
 
-        await ctx.channel.purge(limit=1)
+        await ctx.message.delete()
         if not ctx.voice_client.is_playing():
             source = discord.PCMVolumeTransformer(
                 discord.FFmpegPCMAudio(self.queue.current_song(ctx)['url'], **Music.FFMPEG_OPTIONS))
@@ -285,7 +301,6 @@ class Music(commands.Cog):
                 colour=ctx.author.colour,
                 timestamp=dt.datetime.utcnow()
             )
-            # embed.add_field(name="🎶",value="✅",inline=False)
             embed.set_footer(text=f"Invoked by {ctx.author.display_name}", icon_url=ctx.author.avatar_url)
             await ctx.send(embed=embed)
 
@@ -293,35 +308,34 @@ class Music(commands.Cog):
     async def pause(self, ctx):
         if self.voice[ctx.guild.id] is None:
             await ctx.send(embed=discord.Embed(
-                title='🚫 | The command is not available at this time.'
-            ), delete_after=10)
+                title='🚫 | You must join voice channel first.'
+            ), delete_after=15)
         else:
             self.voice[ctx.guild.id].pause()
             await ctx.send(embed=discord.Embed(
                 title=" ⏸ | Paused"
-            ), delete_after=60)
+            ), delete_after=30)
 
     @cog_ext.cog_slash(name="resume", description="Resume playing")
     async def resume(self, ctx):
         if self.voice[ctx.guild.id] is None:
             await ctx.send(embed=discord.Embed(
-                title='🚫 | The command is not available at this time.'
+                title='🚫 | You must join voice channel first.'
             ), delete_after=10)
         else:
             self.voice[ctx.guild.id].resume()
             await ctx.send(embed=discord.Embed(
                 title='▶ | Resumed'
-            ), delete_after=60)
+            ), delete_after=30)
 
-    # @cog_ext.cog_slash(name="volume", description="Change the volume", options=[
-    #     create_option(
-    #         name="value",
-    #         description="Percentage of volume",
-    #         option_type=4,
-    #         required=True
-    #     )
-    # ])
-    @commands.command()
+    @cog_ext.cog_slash(name="volume", description="Change the volume", options=[
+        create_option(
+            name="value",
+            description="Percentage of volume",
+            option_type=4,
+            required=True
+        )
+    ])
     async def volume(self, ctx, value: int):
         if self.voice[ctx.guild.id] is None:
             await ctx.send(embed=discord.Embed(
@@ -376,7 +390,7 @@ class Music(commands.Cog):
             title = self.queue.get_queue(ctx)[value]['title']
             if self.queue.get_position(ctx) > value:
                 self.queue.position[ctx.guild.id] -= 1
-            e = self.queue.get_queue(ctx).pop(value) if self.queue.get_position(ctx) != (value - 1) else None
+            e = self.queue.get_queue(ctx).pop(value-1) if self.queue.get_position(ctx) != (value - 1) else None
             if e is None:
                 await ctx.send(embed=discord.Embed(title="This song is playing"), delete_after=60)
                 return
@@ -386,7 +400,7 @@ class Music(commands.Cog):
         else:
             await ctx.send(embed=discord.Embed(
                 title='🚫 | Invalid index.'
-            ), delete_after=10)
+            ), delete_after=15)
 
     @cog_ext.cog_slash(name="jump", description="jump into a song on the queue", options=[
         create_option(
@@ -510,7 +524,7 @@ class Music(commands.Cog):
     )
     async def savequeue(self, ctx, name: str):
         dirName = f"list_queue/{ctx.guild.id}"
-        txtName = f"list_queue/{ctx.guild.id}/{name.lower()}.txt"
+        txtName = f"list_queue/{ctx.guild.id}/{name.lower().strip()}.txt"
         info = {"Author": ctx.author.display_name, "Date created": dt.datetime.utcnow()}
         if not os.path.exists(dirName):
             os.makedirs(dirName)
@@ -545,8 +559,8 @@ class Music(commands.Cog):
             )
         ]
     )
-    async def loadqueue(self, ctx, name: str):
-        txtName = f"list_queue/{ctx.guild.id}/{name.lower()}.txt"
+    async def loadqueue(self, ctx,name: str):
+        txtName = f"list_queue/{ctx.guild.id}/{name.lower().strip()}.txt"
         if not os.path.exists(txtName):
             await ctx.send(embed=discord.Embed(
                 title="🚫 | Invaild name of queue!"
