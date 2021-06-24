@@ -265,6 +265,8 @@ class Music(commands.Cog):
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(input, download=False)
+            
+            await ctx.message.delete()
         else:
             YDL_OPTIONS = {'format': 'bestaudio', "ytsearch": "--default-search",
                            'verbose': True, "quiet": True, "geo-bypass": True
@@ -285,7 +287,6 @@ class Music(commands.Cog):
                           ("..." if len(info['title'][70:]) else "") + \
                           f"`{info['duration'] // 60}:{info['duration'] % 60}`\n"
 
-        await ctx.message.delete()
         if not ctx.voice_client.is_playing():
             source = discord.PCMVolumeTransformer(
                 discord.FFmpegPCMAudio(self.queue.current_song(ctx)['url'], **Music.FFMPEG_OPTIONS))
