@@ -178,13 +178,19 @@ class Music(commands.Cog):
     async def on_voice_state_update(self, member, before, after):
         if after.channel is None:
             self.queue.clear_queue(member.guild.id)
-            self.voice[member.guild.id].stop()
+            try:
+                self.voice[member.guild.id].stop()
+            except:
+                pass
             self.voice[member.guild.id] = None
         elif before.channel is None:
             return
         elif after.channel != before.channel:
             self.queue.clear_queue(member.guild.id)
-            self.voice[member.guild.id].stop()
+            try:
+                self.voice[member.guild.id].stop()
+            except:
+                pass
 
     def play_next_song(self, ctx, voice):
         next_song = self.queue.get_next_song(ctx.guild.id)
@@ -219,17 +225,19 @@ class Music(commands.Cog):
 
         else:
             content = "`/play + url` to play the song\n"
-
-        content += f"**{type}**```css\n"
-        count = 0
-        for index in range(state[0], state[1]):
-            content += f"{index + 1}) {str(lis_song[index]['title'])[:70]}" + \
-                       ("..." if len(lis_song[index]['title'][70:]) else "") + \
-                       " " + f"{lis_song[index]['duration'] // 60}:{lis_song[index]['duration'] % 60}\n"
-            count += 1
-            if count == 10:
-                break
-        content += "\n```"
+        if state[0] == state[1]:
+            content += f"**{type}:**```fix\n Empty ``` "
+        else:
+            content += f"**{type}:**```css\n"
+            count = 0
+            for index in range(state[0], state[1]):
+                content += f"{index + 1}) {str(lis_song[index]['title'])[:70]}" + \
+                           ("..." if len(lis_song[index]['title'][70:]) else "") + \
+                           " " + f"{lis_song[index]['duration'] // 60}:{lis_song[index]['duration'] % 60}\n"
+                count += 1
+                if count == 10:
+                    break
+            content += ".\n```"
 
         return content
 
@@ -263,7 +271,7 @@ class Music(commands.Cog):
     async def connect(self, ctx):
         if ctx.author.voice is None:
             await ctx.send(embed=discord.Embed(title="🚫 | You must join voice channel first"), delete_after=30)
-            return
+            return 0
         else:
             try:
                 channel = ctx.author.voice.channel
@@ -271,6 +279,7 @@ class Music(commands.Cog):
             except:
                 pass
             self.voice[ctx.guild.id] = ctx.guild.voice_client
+            return 1
 
     @cog_ext.cog_slash(name="play", description="Play a song given by a url", options=[
         create_option(
@@ -281,7 +290,8 @@ class Music(commands.Cog):
         )])
     async def play(self, ctx, input):
         await ctx.defer()
-        await self.connect(ctx)
+        if not await self.connect(ctx):
+            return
 
         if re.match(URL_REGEX, input):
             YDL_OPTIONS = {'format': 'bestaudio',
@@ -498,8 +508,8 @@ class Music(commands.Cog):
             else:
                 await ctx.send(embed=discord.Embed(title="⏭ | Skipped", colour=ctx.guild.me.colour), delete_after=60)
 
-    @cog_ext.cog_slash(name="queue", description="Show the queue")
-    async def queue(self, ctx):
+    @cog_ext.cog_slash(name="playlist", description="Show the queue")
+    async def playlist(self, ctx):
         await ctx.defer()
         if await Music.check_status_bot_and_user(ctx):
             queue = self.queue.get_queue(ctx.guild.id)
@@ -660,4 +670,4 @@ def update_state(current, command, max):
 
 def setup(client):
     client.add_cog(Music(client))
-    
+
