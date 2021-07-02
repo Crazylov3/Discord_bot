@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from discord_slash import SlashCommand
 import discord
 from discord.ext import commands,tasks
-import itertools
 
 load_dotenv()
 client = commands.Bot(command_prefix="/",activity =discord.Activity(type=discord.ActivityType.listening, name="music"))
