@@ -210,6 +210,8 @@ class Music(commands.Cog):
                     fut.result()
                 except:
                     pass
+
+
             except:
                 self.remove(ctx, self.queue.get_position(ctx.guild.id))
                 if self.queue.is_empty(ctx.guild.id):
@@ -539,7 +541,7 @@ class Music(commands.Cog):
                 button_ctx: ComponentContext = await wait_for_component(self.client, components=action_row)
                 current_state = update_state(current_state, button_ctx.component['label'], len(window_state))
                 await button_ctx.edit_origin(
-                    content=self.get_content(ctx, queue, window_state[current_state], "Playlist :"),
+                    content=self.get_content(ctx, queue, window_state[current_state], "Playlist"),
                     components=[action_row],
                     delete_after=600
                 )
@@ -656,16 +658,16 @@ class Music(commands.Cog):
             ))
 
 
-def update_state(current, command, max):
+def update_state(current, command, limit):
     new = current
     if command == "First":
         new = 0
     elif command == "Back":
         new = max(0, current - 1)
     elif command == "Next":
-        new = min(current + 1, max - 1)
+        new = min(current + 1, limit - 1)
     elif command == "Last":
-        new = max - 1
+        new = limit - 1
     return new
 
 
