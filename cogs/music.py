@@ -185,7 +185,7 @@ class Music(commands.Cog):
             self.voice[member.guild.id] = None
         elif before.channel is None:
             return
-        elif after.channel != before.channel:
+        elif after.channel.id != before.channel.id:
             self.queue.clear_queue(member.guild.id)
             try:
                 self.voice[member.guild.id].stop()
@@ -237,7 +237,7 @@ class Music(commands.Cog):
                 count += 1
                 if count == 10:
                     break
-            content += ".\n```"
+            content += "\n```"
 
         return content
 
