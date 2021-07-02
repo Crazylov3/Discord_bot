@@ -3,8 +3,8 @@ dnspython
 async-timeout==3.0.1
 python-dotenv
 youtube_dl
-discord
-discord-py-slash-command
+discord==1.7.3
+discord-py-slash-command==2.2.1
 asyncio
 typing
 datetime
