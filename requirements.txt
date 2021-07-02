@@ -8,4 +8,4 @@ discord-py-slash-command==2.2.1
 asyncio
 typing
 datetime
-
+itertools
