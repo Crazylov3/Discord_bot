@@ -176,21 +176,22 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        if after.channel is None:
-            self.queue.clear_queue(member.guild.id)
-            try:
-                self.voice[member.guild.id].stop()
-            except:
-                pass
-            self.voice[member.guild.id] = None
-        elif before.channel is None:
-            return
-        elif after.channel.id != before.channel.id:
-            self.queue.clear_queue(member.guild.id)
-            try:
-                self.voice[member.guild.id].stop()
-            except:
-                pass
+        if member.id == 854641854658510859:
+            if after.channel is None:
+                self.queue.clear_queue(member.guild.id)
+                try:
+                    self.voice[member.guild.id].stop()
+                except:
+                    pass
+                self.voice[member.guild.id] = None
+            elif before.channel is None:
+                return
+            elif after.channel.id != before.channel.id:
+                self.queue.clear_queue(member.guild.id)
+                try:
+                    self.voice[member.guild.id].stop()
+                except:
+                    pass
 
     def play_next_song(self, ctx, voice):
         next_song = self.queue.get_next_song(ctx.guild.id)
