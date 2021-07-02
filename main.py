@@ -2,11 +2,18 @@ import os
 from dotenv import load_dotenv
 from discord_slash import SlashCommand
 import discord
-from discord.ext import commands
+from discord.ext import commands,tasks
+import itertools
 
 load_dotenv()
 client = commands.Bot(command_prefix="/")
 slash = SlashCommand(client, sync_commands=True, sync_on_cog_reload=True)
+status = itertools.cycle(
+    ["Meow ăn cơm", "Meow rửa bát", "Meow nghe nhạc", "Meow chơi đồ", "Meow tìm meow cái", "Crush từ chối Meow",
+     "Tim Meow tan nát"
+     "Meow bị buồn",
+     "Meow bị mệt", "Meow muốn đi ngủ", "Meow đang ngủ","Meow tỉnh dậy và đang tìm đồ ăn" ,"Meow tập thể dục"])
+
 
 
 @client.event
@@ -15,7 +22,12 @@ async def on_ready():
         if filename.endswith(".py"):
             client.reload_extension(f"cogs.{filename[:-3]}")
     await client.change_presence(status=discord.Status.online,activity=discord.Game("Cỏ"))
+    change_status.start()
     print("Bot is ready")
+    
+@tasks.loop(seconds=20)
+async def change_status():
+    await client.change_presence(status=discord.Status.online, activity=discord.CustomActivity(next(status)))
 
 @client.command()
 async def ping(ctx):
