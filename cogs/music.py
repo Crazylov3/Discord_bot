@@ -43,6 +43,7 @@ class Queue:
         self._queue = {}
         self.position = {}
         self.repeat_mode = {}
+
         for guild_id in self.list_guild_id:
             if guild_id not in self._queue.keys():
                 self._queue[guild_id] = []
@@ -144,9 +145,12 @@ class Music(commands.Cog):
         self.queue = Queue([guild.id for guild in client.guilds])
         self.voice = {}  # list of voice client
         self._cache = {}  # msg need to delete
+        self.channel_send_status = {}
+        self.command_ctx = {}
         for guild_id in [guild.id for guild in client.guilds]:
             if guild_id not in self.voice.keys():
                 self.voice[guild_id] = None
+                self.channel_send_status[guild_id] = False
 
     @staticmethod
     async def check_status_bot_and_user(ctx):
@@ -288,16 +292,18 @@ class Music(commands.Cog):
             self._cache[ctx.guild.id] = await ctx.send(self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
                                                                         [self.queue.get_position(ctx.guild.id) + 1,
                                                                          min(self.queue.length(ctx.guild.id),
-                                                                             self.queue.get_position(ctx.guild.id) + 6)])
-                                                       , delete_after=self.queue.current_song(ctx.guild.id)['duration'])
-        else:
-            self._cache[ctx.guild.id] = await ctx.channel.send(self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
-                                                                        [self.queue.get_position(ctx.guild.id) + 1,
-                                                                         min(self.queue.length(ctx.guild.id),
                                                                              self.queue.get_position(
                                                                                  ctx.guild.id) + 6)])
                                                        , delete_after=self.queue.current_song(ctx.guild.id)['duration'])
-
+        else:
+            self._cache[ctx.guild.id] = await ctx.channel.send(self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
+                                                                                [self.queue.get_position(
+                                                                                    ctx.guild.id) + 1,
+                                                                                 min(self.queue.length(ctx.guild.id),
+                                                                                     self.queue.get_position(
+                                                                                         ctx.guild.id) + 6)])
+                                                               , delete_after=self.queue.current_song(ctx.guild.id)[
+                    'duration'])
 
     def play_next_song(self, ctx, voice):
         next_song = self.queue.get_next_song(ctx.guild.id)
@@ -309,19 +315,29 @@ class Music(commands.Cog):
                         fut_ = asyncio.run_coroutine_threadsafe(coro_, self.client.loop)
                     except:
                         pass
-
                 source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(next_song['url'], **Music.FFMPEG_OPTIONS))
                 voice.play(source, after=lambda e: self.play_next_song(ctx, voice))
-                coro = ctx.channel.send(
-                    content=self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
-                                             [self.queue.get_position(ctx.guild.id) + 1,
-                                              min(self.queue.get_position(ctx.guild.id) + 6,
-                                                  self.queue.length(ctx.guild.id))]),
-                    delete_after=self.queue.current_song(ctx.guild.id)['duration'])
+                if not self.channel_send_status[ctx.guild.id]:
+                    coro = ctx.channel.send(
+                        content=self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
+                                                 [self.queue.get_position(ctx.guild.id) + 1,
+                                                  min(self.queue.get_position(ctx.guild.id) + 6,
+                                                      self.queue.length(ctx.guild.id))]),
+                        delete_after=self.queue.current_song(ctx.guild.id)['duration'])
+                else:
+                    coro = self.command_ctx[ctx.guild.id].send(
+                        content=self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
+                                                 [self.queue.get_position(ctx.guild.id) + 1,
+                                                  min(self.queue.get_position(ctx.guild.id) + 6,
+                                                      self.queue.length(ctx.guild.id))]),
+                        delete_after=self.queue.current_song(ctx.guild.id)['duration'])
+                    self.channel_send_status[ctx.guild.id] = False
+
                 fut = asyncio.run_coroutine_threadsafe(coro, self.client.loop)
                 self._cache[ctx.guild.id] = fut.result()
             except:
-                self.remove(ctx, self.queue.get_position(ctx.guild.id))
+                self.queue.get_queue(ctx.guild.id).pop(self.queue.get_position(ctx.guild.id))
+                self.queue.position[ctx.guild.id] -= 1
                 if self.queue.is_empty(ctx.guild.id):
                     return
                 self.play_next_song(ctx, voice)
@@ -487,15 +503,18 @@ class Music(commands.Cog):
         )
     ])
     async def jump(self, ctx, value):
+
         if await Music.check_status_bot_and_user(ctx):
             if 0 < value <= self.queue.length(ctx.guild.id):
+                await ctx.defer()
                 if self.voice[ctx.guild.id].is_playing():
+                    self.command_ctx[ctx.guild.id] = ctx
+                    self.channel_send_status[ctx.guild.id] = True
                     self.queue.position[ctx.guild.id] = value - 2
                     self.voice[ctx.guild.id].stop()
                 else:
                     self.queue.position[ctx.guild.id] = value - 1
-                    await ctx.defer()
-                    await self._play(ctx)
+                    await self._play(ctx, channel_send=False)
 
             else:
                 await ctx.send(embed=discord.Embed(
@@ -531,8 +550,11 @@ class Music(commands.Cog):
 
     @cog_ext.cog_slash(name="skip", description="skip current song")
     async def skip(self, ctx):
+
         if await Music.check_status_bot_and_user(ctx):
             if self.voice[ctx.guild.id].is_playing():
+                self.command_ctx[ctx.guild.id] = ctx
+                self.channel_send_status[ctx.guild.id] = True
                 await ctx.defer()
                 self.voice[ctx.guild.id].stop()
 
@@ -545,8 +567,7 @@ class Music(commands.Cog):
     async def playlist(self, ctx):
         if await Music.check_status_bot_and_user(ctx):
             await ctx.defer()
-            queue = self.queue.get_queue(ctx.guild.id)
-            if not queue:
+            if not self.queue.get_queue(ctx.guild.id):
                 await ctx.send(
                     embed=discord.Embed(
                         title="Ops! The queue is empty!"
@@ -554,8 +575,10 @@ class Music(commands.Cog):
                     hidden=True
                 )
                 return
-            window_state = [(i * 10, i * 10 + 10) for i in range(len(queue) // 10)] + \
-                           ([(len(queue) // 10 * 10, len(queue))] if len(queue) % 10 != 0 else [])
+            window_state = [(i * 10, i * 10 + 10) for i in range(len(self.queue.get_queue(ctx.guild.id)) // 10)] + \
+                           ([(len(self.queue.get_queue(ctx.guild.id)) // 10 * 10,
+                              len(self.queue.get_queue(ctx.guild.id)))] if len(
+                               self.queue.get_queue(ctx.guild.id)) % 10 != 0 else [])
             current_state = 0
             action_row = create_actionrow(
                 create_button(style=ButtonStyle.blue, label="First"),
@@ -564,13 +587,17 @@ class Music(commands.Cog):
                 create_button(style=ButtonStyle.blue, label="Last"),
             )
             await ctx.send(
-                content=self.get_content(ctx, queue, window_state[current_state], "Playlist"),
+                content=self.get_content(ctx, self.queue.get_queue(ctx.guild.id), window_state[current_state],
+                                         "Playlist"),
                 components=[action_row],
                 delete_after=600
             )
             while True:
-                window_state_cache = [(i * 10, i * 10 + 10) for i in range(len(queue) // 10)] + \
-                                     ([(len(queue) // 10 * 10, len(queue))] if len(queue) % 10 != 0 else [])
+                window_state_cache = [(i * 10, i * 10 + 10) for i in
+                                      range(len(self.queue.get_queue(ctx.guild.id)) // 10)] + \
+                                     ([(len(self.queue.get_queue(ctx.guild.id)) // 10 * 10,
+                                        len(self.queue.get_queue(ctx.guild.id)))] if len(
+                                         self.queue.get_queue(ctx.guild.id)) % 10 != 0 else [])
                 button_ctx: ComponentContext = await wait_for_component(self.client, components=action_row)
                 if window_state_cache == window_state:
                     current_state = update_state(current_state, button_ctx.component['label'], len(window_state))
@@ -578,7 +605,8 @@ class Music(commands.Cog):
                     window_state = window_state_cache
                     current_state = 0
                 await button_ctx.edit_origin(
-                    content=self.get_content(ctx, queue, window_state[current_state], "Playlist"),
+                    content=self.get_content(ctx, self.queue.get_queue(ctx.guild.id), window_state[current_state],
+                                             "Playlist"),
                     components=[action_row],
                     delete_after=600
                 )

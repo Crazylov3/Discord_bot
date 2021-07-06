@@ -10,15 +10,15 @@ class Basic_command(commands.Cog):
     @commands.command()
     async def girl(self,ctx):
         async with ctx.channel.typing():
-            with open("cogs/Google_API/Ids_file.txt", "r", encoding="utf-8") as file:
+            with open("cogs/Google_API/Links_photo.txt", "r", encoding="utf-8") as file:
                 arr = []
                 for line in file:
                     arr.append(line)
 
             id = np.random.randint(0, len(arr))
-            response = service.mediaItems().get(mediaItemId=arr[id].strip()).execute()
+            url = arr[id].strip()
             embed = discord.Embed(title="Gái ...🤤")
-            embed.set_image(url = response['baseUrl'])
+            embed.set_image(url = url)
             await ctx.send(embed = embed)
 
 
