@@ -9,16 +9,15 @@ class Basic_command(commands.Cog):
     @commands.command()
     async def girl(self,ctx):
         async with ctx.channel.typing():
-            with open("cogs/Google_API/Links_photo.txt", "r", encoding="utf-8") as file:
-                arr = []
-                for line in file:
-                    arr.append(line)
-
-            id = np.random.randint(0, len(arr))
-            url = arr[id].strip()
-            embed = discord.Embed(title="Gái ...🤤",colour=ctx.guild.me.colour)
-            embed.set_image(url = url)
-            await ctx.send(embed = embed)
+            while True:
+                try:
+                    id = np.random.randint(0, 1378)
+                    embed = discord.Embed(title="Gái ...🤤",colour=ctx.guild.me.colour)
+                    embed.set_image(url = f"https://raw.githubusercontent.com/Crazylov3/Photo-Libary/main/Photos/{id}.png")
+                    await ctx.send(embed = embed)
+                    break
+                except:
+                    pass
 
 
 def setup(client):

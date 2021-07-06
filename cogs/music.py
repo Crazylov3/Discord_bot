@@ -351,10 +351,10 @@ class Music(commands.Cog):
         )])
     async def play(self, ctx, input):
         choose_song = False
-        await ctx.defer()
+
         if not await self._connect(ctx):
             return
-
+        await ctx.defer()
         if re.match(URL_REGEX, input):
             YDL_OPTIONS = {'format': 'bestaudio',
                            'verbose': True, "quiet": True, "geo-bypass": True
