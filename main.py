@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands,tasks
 
 load_dotenv()
-client = commands.Bot(command_prefix="/",activity =discord.Activity(type=discord.ActivityType.listening, name="music"))
+client = commands.Bot(command_prefix=".",activity =discord.Activity(type=discord.ActivityType.listening, name="music"))
 slash = SlashCommand(client, sync_commands=True, sync_on_cog_reload=True)
 
 
