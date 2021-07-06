@@ -16,7 +16,7 @@ class Basic_command(commands.Cog):
 
             id = np.random.randint(0, len(arr))
             url = arr[id].strip()
-            embed = discord.Embed(title="Gái ...🤤")
+            embed = discord.Embed(title="Gái ...🤤",colour=ctx.guild.me.colour)
             embed.set_image(url = url)
             await ctx.send(embed = embed)
 
