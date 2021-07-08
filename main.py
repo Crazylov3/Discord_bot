@@ -18,7 +18,6 @@ async def on_ready():
     
 @client.command()
 async def ping(ctx):
-    print(ctx.guild.id)
     await ctx.reply(f"Ping: {round(client.latency*1000)} ms",mention_author=False)
 
 
