@@ -707,7 +707,6 @@ class Music(commands.Cog):
 
     @cog_ext.cog_slash(name="savedqueue", description="Show the list of saved queue")
     async def savedqueue(self, ctx):
-        await ctx.defer()
         lis = []
         if os.path.exists(f"list_queue/{ctx.guild.id}"):
             for filename in os.listdir(f"list_queue/{ctx.guild.id}"):
