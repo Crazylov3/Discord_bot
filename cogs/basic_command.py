@@ -89,9 +89,9 @@ class Basic_command(commands.Cog):
                                         )
 
                     # embed.set_footer(text=f"Invoked by {ctx.author.display_name}", icon_url=ctx.author.avatar_url)
-                    await ctx.send(embed=embed)
+                    await ctx.reply(embed=embed, mention_author = False, delete_after = 120)
                     return
-            await ctx.send(content="**Invalid city name**\n *Try to use another name*")
+            await ctx.reply(content="**Invalid city name**\n *\\Try to use another name\\*",mention_author = False,delete_after = 60)
 
 
 def setup(client):
