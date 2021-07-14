@@ -233,7 +233,7 @@ class TienLen(commands.Cog):
     def _shuffle_cards(self, guild_id):
         random.shuffle(list_card)
         for j, player in enumerate(self._players_joined[guild_id]):
-            self._player_cards[guild_id][player] = _sort(list_card[j * 3:(j + 1) * 3])
+            self._player_cards[guild_id][player] = _sort(list_card[j * 13:(j + 1) *13])
 
     async def _update_current_board(self, guild_id, new_move=None):
         if new_move is None:
