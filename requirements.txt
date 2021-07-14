@@ -15,3 +15,5 @@ google-auth-oauthlib
 unidecode
 statistics
 requests
+pygame
+random
