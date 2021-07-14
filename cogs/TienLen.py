@@ -233,7 +233,7 @@ class TienLen(commands.Cog):
     def _shuffle_cards(self, guild_id):
         random.shuffle(list_card)
         for j, player in enumerate(self._players_joined[guild_id]):
-            self._player_cards[guild_id][player] = _sort(list_card[j * 13:(j + 1) *13])
+            self._player_cards[guild_id][player] = _sort(list_card[j * 13:(j + 1) * 13])
 
     async def _update_current_board(self, guild_id, new_move=None):
         if new_move is None:
@@ -259,6 +259,7 @@ class TienLen(commands.Cog):
     async def _next_state(self, guild_id, new_move=None):
         self._total_number_moving[guild_id] += 1
         if self._check_end_game(guild_id):
+            self._playing_status[guild_id] = False
             await self._msg_main_playing[guild_id].edit(
                 embed=discord.Embed(title="Game Over",
                                     description="\n".join([f"Rank {k + 1}:{player.display_name}" for k, player in
