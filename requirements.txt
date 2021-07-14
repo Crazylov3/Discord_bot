@@ -16,4 +16,3 @@ unidecode
 statistics
 requests
 pygame
-random
