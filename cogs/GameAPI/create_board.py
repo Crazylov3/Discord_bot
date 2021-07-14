@@ -1,6 +1,6 @@
 import pygame
 import os
-
+os.environ['SDL_VIDEODRIVER'] = 'dummy'
 def create_user_board(guild_id,name_user,*args):
     pygame.font.init()
     pygame.init()
