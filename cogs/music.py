@@ -781,11 +781,14 @@ def check_playlist(url: str):
     case0 = "/playlist?list="
     case_1 = "/watch"
     case_2 = "list="
+    sensitive_case = "&list=LL&"
     case = [True if url.find(case0) != -1 else False,
-            True if url.find(case_1) != -1 and url.find(case_2) != -1 else False]
-    if case[0] or case[1]:
+            True if url.find(case_1) != -1 and url.find(case_2) != -1 else False,
+            True if url.find(sensitive_case) != -1 else False]
+    if (case[0] or case[1]) and not case[2] :
         return True
     return False
+
 
 
 def setup(client):
