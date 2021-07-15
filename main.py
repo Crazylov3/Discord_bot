@@ -27,7 +27,7 @@ async def on_message(msg):
             title = ls[1]
             text = ls[2]
             for guild in client.guilds:
-                general = discord.utils.find(lambda x: x.name == 'general', guild.text_channels)
+                general = discord.utils.find(lambda x: x.name.lower() == 'general' or x.name.lower() == 'chung', guild.text_channels)
                 if general and general.permissions_for(guild.me).send_messages:
                     await general.send(embed=discord.Embed(title=title,description=text))
 
