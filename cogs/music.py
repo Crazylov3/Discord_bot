@@ -3,7 +3,7 @@ import datetime as dt
 import os
 import random
 import re
-
+import requests
 from enum import Enum
 import discord
 from discord.ext import commands
@@ -288,6 +288,8 @@ class Music(commands.Cog):
     async def _play(self, ctx, channel_send=False):
         source = discord.PCMVolumeTransformer(
             discord.FFmpegPCMAudio(self.queue.current_song(ctx.guild.id)['url'], **Music.FFMPEG_OPTIONS))
+
+
         self.voice[ctx.guild.id].play(source, after=lambda e: self.play_next_song(ctx, self.voice[ctx.guild.id]))
         if not channel_send:
             self._cache[ctx.guild.id] = await ctx.send(self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
@@ -316,20 +318,19 @@ class Music(commands.Cog):
                         fut_ = asyncio.run_coroutine_threadsafe(coro_, self.client.loop)
                     except:
                         pass
-                try:
-                    source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(next_song['url'], **Music.FFMPEG_OPTIONS))
-                except:
-                    YDL_OPTIONS = {'format': 'bestaudio', "noplaylist": True, "quiet": True, "geo-bypass": True
+                source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(next_song['url'], **Music.FFMPEG_OPTIONS))
+                if source.read() == b'':
+                    YDL_OPTIONS = {"format": "bestaudio/best", "restrictfilenames": True, "noplaylist": True,
+                                   "nocheckcertificate": True, "ignoreerrors": True, "logtostderr": False,
+                                   "quiet": True, "no_warnings": True,
+                                   "source_address": "0.0.0.0"
                                    }
                     with YoutubeDL(YDL_OPTIONS) as ydl:
                         simple_info = get_simple_info(ydl.extract_info(next_song["webpage_url"], download=False))
                     self.queue.get_queue(ctx.guild.id)[self.queue.get_position(ctx.guild.id)] = simple_info
                     source = discord.PCMVolumeTransformer(
                         discord.FFmpegPCMAudio(simple_info['url'], **Music.FFMPEG_OPTIONS))
-                    # self.queue.get_queue(ctx.guild.id).pop(self.queue.get_position(ctx.guild.id))
-                    # if self.queue.is_empty(ctx.guild.id):
-                    #     return
-                    # self.play_next_song(ctx, voice)
+
                 voice.play(source, after=lambda e: self.play_next_song(ctx, voice))
                 if not self.channel_send_status[ctx.guild.id]:
                     coro = ctx.channel.send(
@@ -349,6 +350,7 @@ class Music(commands.Cog):
 
                 fut = asyncio.run_coroutine_threadsafe(coro, self.client.loop)
                 self._cache[ctx.guild.id] = fut.result()
+
             except:
                 self.queue.get_queue(ctx.guild.id).pop(self.queue.get_position(ctx.guild.id))
                 if self.queue.is_empty(ctx.guild.id):
@@ -369,13 +371,19 @@ class Music(commands.Cog):
             return
         await ctx.defer()
         if re.match(URL_REGEX, input):
-            YDL_OPTIONS = {'format': 'bestaudio',"noplaylist":True, "quiet": True, "geo-bypass": True
+            YDL_OPTIONS = {"format": "bestaudio/best", "restrictfilenames": True, "noplaylist": True,
+                           "nocheckcertificate": True, "ignoreerrors": True, "logtostderr": False, "quiet": True,
+                           "no_warnings": True,
+                           "source_address": "0.0.0.0"
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(input, download=False)
 
         else:
-            YDL_OPTIONS = {'format': 'bestaudio', "ytsearch": "--default-search", "quiet": True, "geo-bypass": True
+            YDL_OPTIONS = {"format": "bestaudio/best", "restrictfilenames": True, "noplaylist": True,
+                           "nocheckcertificate": True,
+                           "ignoreerrors": True, "logtostderr": False, "quiet": True, "no_warnings": True,
+                           "source_address": "0.0.0.0", "ytsearch": "--default-search"
                            }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 _info = ydl.extract_info(f"ytsearch5:{input}", download=False)
@@ -393,12 +401,16 @@ class Music(commands.Cog):
 
         number_song = 1
         if check_playlist(input):
-            YDL_OPTIONS = {'format': 'bestaudio', "quiet": True, "geo-bypass": True
-                           }
+            YDL_OPTIONS = {"format": "bestaudio/best", "restrictfilenames": True,
+                                         "nocheckcertificate": True, "ignoreerrors": True, "logtostderr": False,
+                                         "quiet": True, "no_warnings": True,
+                                         "source_address": "0.0.0.0"
+                                         }
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 playlist_info = ydl.extract_info(input, download=False)
                 number_song = len(playlist_info["entries"])
-            self.queue.add(ctx.guild.id, *[get_simple_info(playlist_info["entries"][e]) for e in range(1,len(playlist_info["entries"]))])
+            self.queue.add(ctx.guild.id, *[get_simple_info(playlist_info["entries"][e]) for e in
+                                           range(1, len(playlist_info["entries"]))])
         embed = discord.Embed(
             description=f"✅ | Added {number_song} track to queue.",
             colour=ctx.guild.me.colour,
@@ -410,12 +422,11 @@ class Music(commands.Cog):
             await ctx.send(embed=embed, delete_after=120)
         else:
             await ctx.channel.send(embed=embed, delete_after=120)
-        await self._cache[ctx.guild.id].edit(content = self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
-                                                                        [self.queue.get_position(ctx.guild.id) + 1,
-                                                                         min(self.queue.length(ctx.guild.id),
-                                                                             self.queue.get_position(
-                                                                                 ctx.guild.id) + 6)]))
-
+        await self._cache[ctx.guild.id].edit(content=self.get_content(ctx, self.queue.get_queue(ctx.guild.id),
+                                                                      [self.queue.get_position(ctx.guild.id) + 1,
+                                                                       min(self.queue.length(ctx.guild.id),
+                                                                           self.queue.get_position(
+                                                                               ctx.guild.id) + 6)]))
 
     @cog_ext.cog_slash(name="pause", description="Pause playing")
     async def pause(self, ctx):
@@ -698,7 +709,7 @@ class Music(commands.Cog):
             ), hidden=True)
         else:
             await ctx.defer()
-            msg = await ctx.send(embed = discord.Embed(description="Loading playlist..."), delete_after=600)
+            msg = await ctx.send(embed=discord.Embed(description="Loading playlist..."), delete_after=600)
             playlist = []
             queue = []
             info = {}
@@ -717,7 +728,7 @@ class Music(commands.Cog):
             embed = discord.Embed(
                 description=f"✅ | Successfully load the `{queuename.lower().strip()}`!"
             )
-            embed.set_footer(text= f"Playlist Author: `{info['Author']}`\nDate created: {info['Date created']}")
+            embed.set_footer(text=f"Playlist Author: `{info['Author']}`\nDate created: {info['Date created']}")
             await msg.edit(embed=embed)
             self.queue.set_queue(ctx.guild.id, queue)
             self.queue.position[ctx.guild.id] -= 1
@@ -758,20 +769,24 @@ def update_state(current, command, limit):
         new = limit - 1
     return new
 
+
 def get_simple_info(info):
     simple_info = {}
-    for key in ["title","duration","url","webpage_url"]:
+    for key in ["title", "duration", "url", "webpage_url"]:
         simple_info[key] = info[key]
-    return  simple_info
+    return simple_info
+
 
 def check_playlist(url: str):
     case0 = "/playlist?list="
     case_1 = "/watch"
     case_2 = "list="
-    case = [True if url.find(case0) != -1 else False,True if url.find(case_1)!=-1 and url.find(case_2)!=-1 else False]
+    case = [True if url.find(case0) != -1 else False,
+            True if url.find(case_1) != -1 and url.find(case_2) != -1 else False]
     if case[0] or case[1]:
         return True
     return False
+
 
 def setup(client):
     client.add_cog(Music(client))

@@ -73,6 +73,8 @@ class TienLen(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.guilds = [guild.id for guild in client.guilds]
+        self._force_stop = {}
+        self._lobby_status  = {}
         self._playing_status = {}
         self._players_joined = {}
         self._number_player = {}
@@ -89,6 +91,7 @@ class TienLen(commands.Cog):
         for guild_id in self.guilds:
             if guild_id not in self._playing_status.keys():
                 self._playing_status[guild_id] = False
+                self._lobby_status[guild_id] = False
                 self._players_joined[guild_id] = []
                 self._number_player[guild_id] = 0
 
@@ -197,6 +200,8 @@ class TienLen(commands.Cog):
         Case 6: Out of card
         :return: Player or True if end else False
         """
+        if self._force_stop.get(guild_id):
+            return True
         if self._total_number_moving[guild_id] == 0:
             for player in self._player_cards[guild_id].keys():
                 cards = self._player_cards[guild_id][player]
@@ -260,6 +265,7 @@ class TienLen(commands.Cog):
         self._total_number_moving[guild_id] += 1
         if self._check_end_game(guild_id):
             self._playing_status[guild_id] = False
+            self._lobby_status[guild_id] = False
             await self._msg_main_playing[guild_id].edit(
                 embed=discord.Embed(title="Game Over",
                                     description="\n".join([f"Rank {k + 1}:{player.display_name}" for k, player in
@@ -408,10 +414,10 @@ class TienLen(commands.Cog):
         )
     ])
     async def tienlen(self, ctx, number):
-
-        if self._playing_status[ctx.guild.id]:
-            await ctx.send(content="The game have already started.", hidden=True)
+        if self._lobby_status[ctx.guild.id]:
+            await ctx.send(content="The lobby have already created", hidden=True)
         else:
+            self._lobby_status[ctx.guild.id] = True
             self._players_joined[ctx.guild.id] = []
             self._number_player[ctx.guild.id] = 0
             self._number_player[ctx.guild.id] = int(number)
@@ -433,6 +439,7 @@ class TienLen(commands.Cog):
             while True:
                 button_ctx: ComponentContext = await wait_for_component(self.client, components=[action_row])
                 if button_ctx.custom_id == "Start":
+                    self._force_stop[ctx.guild.id] = False
                     await self._msg_main_playing[ctx.guild.id].delete()
                     await self.start_play(ctx)
                     break
@@ -473,6 +480,24 @@ class TienLen(commands.Cog):
         else:
             self._msg_playing_player[ctx.guild.id][ctx.author] = ctx
             await self._send_board_to_user(ctx.guild.id, ctx.author)
+
+    @commands.command(name="destroy_card_game")
+    async def destroy_card_game(self,ctx):
+        await ctx.message.delete()
+        if not self._playing_status[ctx.guild.id]:
+            await ctx.send(content="The game haven't started")
+        elif ctx.author not in self._players_joined[ctx.guild.id]:
+            await ctx.send(content="Only the participants of the game can cancel it!")
+        else:
+            self._force_stop[ctx.guild.id] = True
+            self._lobby_status[ctx.guild.id] = False
+            await self._msg_main_playing[ctx.guild.id].edit(
+                embed=discord.Embed(description="Game Over")
+            )
+            self._msg_main_playing[ctx.guild.id] = None
+            self._playing_status[ctx.guild.id] = False
+
+
 
 
 def setup(client):
