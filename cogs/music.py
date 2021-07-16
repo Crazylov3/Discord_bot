@@ -624,7 +624,7 @@ class Music(commands.Cog):
                                      ([(len(self.queue.get_queue(ctx.guild.id)) // 10 * 10,
                                         len(self.queue.get_queue(ctx.guild.id)))] if len(
                                          self.queue.get_queue(ctx.guild.id)) % 10 != 0 else [])
-                button_ctx: ComponentContext = await wait_for_component(self.client, components=action_row)
+                button_ctx: ComponentContext = await wait_for_component(self.client, components=action_row,check = lambda e:e.guild == ctx.guild)
                 if window_state_cache == window_state:
                     current_state = update_state(current_state, button_ctx.component['label'], len(window_state))
                 else:
@@ -790,6 +790,6 @@ def check_playlist(url: str):
     return False
 
 
-
 def setup(client):
     client.add_cog(Music(client))
+

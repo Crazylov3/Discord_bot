@@ -98,6 +98,7 @@ class TienLen(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
         if guild.id not in self._playing_status.keys():
+            self._lobby_status[guild.id] = False
             self._playing_status[guild.id] = False
             self._players_joined[guild.id] = []
             self._number_player[guild.id] = 0
@@ -298,8 +299,8 @@ class TienLen(commands.Cog):
         self._player_finished_playing[guild_id] = []
         self._shuffle_cards(guild_id)
         self._msg_main_playing[guild_id] = await ctx.channel.send(
-            "Use `/show_your_card` to see your card.\n** The game will start in 10s **")
-        await asyncio.sleep(10)
+            "Use `/show_your_card` to see your card.\n** The game will start in 30s **")
+        await asyncio.sleep(30)
         self._create_cycle_playing(guild_id)
         player = self._check_end_game(guild_id)
         if isinstance(player, bool):
@@ -328,7 +329,7 @@ class TienLen(commands.Cog):
             cards_picked = []
             while True:
                 button_ctx: ComponentContext = await wait_for_component(self.client, components=action_row,
-                                                                        check=lambda e: e.author == player)
+                                                                        check=lambda e: e.author == player and e.guild == player.guild)
                 if self._check_end_game(guild_id):
                     embed = discord.Embed(title="Game Over")
                     action_row_ = create_actionrow(
@@ -419,7 +420,6 @@ class TienLen(commands.Cog):
         else:
             self._lobby_status[ctx.guild.id] = True
             self._players_joined[ctx.guild.id] = []
-            self._number_player[ctx.guild.id] = 0
             self._number_player[ctx.guild.id] = int(number)
             self._players_joined[ctx.guild.id].append(ctx.author)
             description = '\n'.join(
@@ -437,7 +437,7 @@ class TienLen(commands.Cog):
             self._msg_playing_player[ctx.guild.id] = {}
             self._msg_playing_player[ctx.guild.id][ctx.author] = ctx
             while True:
-                button_ctx: ComponentContext = await wait_for_component(self.client, components=[action_row])
+                button_ctx: ComponentContext = await wait_for_component(self.client, components=[action_row],check=lambda e:e.guild == ctx.guild)
                 if button_ctx.custom_id == "Start":
                     self._force_stop[ctx.guild.id] = False
                     await self._msg_main_playing[ctx.guild.id].delete()
@@ -494,7 +494,6 @@ class TienLen(commands.Cog):
             await self._msg_main_playing[ctx.guild.id].edit(
                 embed=discord.Embed(description="Game Over")
             )
-            self._msg_main_playing[ctx.guild.id] = None
             self._playing_status[ctx.guild.id] = False
 
 
