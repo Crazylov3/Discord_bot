@@ -74,7 +74,7 @@ class TienLen(commands.Cog):
         self.client = client
         self.guilds = [guild.id for guild in client.guilds]
         self._force_stop = {}
-        self._lobby_status  = {}
+        self._lobby_status = {}
         self._playing_status = {}
         self._players_joined = {}
         self._number_player = {}
@@ -144,7 +144,7 @@ class TienLen(commands.Cog):
     def _create_cycle_playing(self, guild_id):
         self._current_move[guild_id] = None
         self._current_player[guild_id] = 0
-        if not self._origin_cycle_playing[guild_id]:
+        if self._total_number_moving[guild_id] == 0:
             arr = []
             for player in self._player_cards[guild_id].keys():
                 points = sorted([mapping_point[arg] for arg in self._player_cards[guild_id][player]])
@@ -157,13 +157,17 @@ class TienLen(commands.Cog):
             self._cycle_playing[guild_id] = self._origin_cycle_playing[guild_id][
                                             index:] + self._origin_cycle_playing[guild_id][:index]
 
-    def _next_player(self, guild_id):
-        if self._current_player[guild_id] < len(self._cycle_playing[guild_id]) - 1:
+
+    def _next_player(self, guild_id, skip = False):
+        if skip:
+            if self._current_player[guild_id] > len(self._cycle_playing[guild_id]) - 1:
+                self._current_player[guild_id] = 0
+        elif self._current_player[guild_id] < len(self._cycle_playing[guild_id]) - 1:
             self._current_player[guild_id] += 1
         elif self._current_player[guild_id] >= len(self._cycle_playing[guild_id]) - 1:
             self._current_player[guild_id] = 0
         if self._cycle_playing[guild_id][self._current_player[guild_id]] not in self._origin_cycle_playing[guild_id]:
-            self._next_player(guild_id)
+            self._next_player(guild_id,skip)
 
     def get_number_joined_player(self, guild_id):
         return len(self._players_joined[guild_id])
@@ -173,12 +177,13 @@ class TienLen(commands.Cog):
             return False
         if not set(new_move).issubset(set(player_cards)):
             return False
-        if self._get_type(old_move) is None:
-            return False if self._get_type(new_move) is None else True
+        old_type = self._get_type(old_move)
         new_type = self._get_type(new_move)
+        if old_type is None:
+            return False if new_type is None else True
+
         if new_type is None:
             return False
-        old_type = self._get_type(old_move)
         if old_type == new_type:
             return True if self._get_point(old_move) < self._get_point(new_move) else False
         elif new_type[0] == 5 and old_type[0] == 1 and int(mapping_point[old_move[0]]) == 15:
@@ -228,9 +233,13 @@ class TienLen(commands.Cog):
                 return False
         return True
 
-    def _check_finished_player(self, guild_id):
-        if not self._player_cards[guild_id][self._cycle_playing[guild_id][self._current_player[guild_id]]]:
-            player = self._cycle_playing[guild_id][self._current_player[guild_id]]
+    def _check_finished_player(self, guild_id,player):
+        if not self._player_cards[guild_id][player]:
+            index = self._origin_cycle_playing[guild_id].index(player)
+            if index == len(self._origin_cycle_playing[guild_id])-1:
+                self._player_start_cycle[guild_id] = self._origin_cycle_playing[guild_id][0]
+            else:
+                self._player_start_cycle[guild_id] = self._origin_cycle_playing[guild_id][index + 1]
             self._origin_cycle_playing[guild_id].remove(player)
             self._player_finished_playing[guild_id].append(player)
             return player
@@ -252,7 +261,7 @@ class TienLen(commands.Cog):
         msg = await channel_target.send(
             file=discord.File(f'cogs/GameAPI/playing_guild/{guild_id}/0current.png'))
         if self._player_finished_playing[guild_id]:
-            description = "\n".join([f"**Rank {rank}: {player.display_name}**" for rank, player in
+            description = "\n".join([f"**Rank {rank+1}: {player.display_name}**" for rank, player in
                                      enumerate(self._player_finished_playing[guild_id])])
         else:
             description = "..."
@@ -263,6 +272,7 @@ class TienLen(commands.Cog):
         await self._msg_main_playing[guild_id].edit(content="The game has started", embed=embed)
 
     async def _next_state(self, guild_id, new_move=None):
+
         self._total_number_moving[guild_id] += 1
         if self._check_end_game(guild_id):
             self._playing_status[guild_id] = False
@@ -274,20 +284,20 @@ class TienLen(commands.Cog):
             )
         elif new_move is None:
             if len(self._cycle_playing[guild_id]) == 1:
-                if self._cycle_playing[guild_id][0] not in self._origin_cycle_playing[guild_id]:
-                    self._next_player(guild_id)
-                    self._player_start_cycle[guild_id] = self._current_player[guild_id]
-                else:
+                if self._cycle_playing[guild_id][0] in self._origin_cycle_playing[guild_id]:
                     self._player_start_cycle[guild_id] = self._cycle_playing[guild_id][0]
                 self._create_cycle_playing(guild_id)
-                await self._update_current_board(guild_id)
             else:
-                self._next_player(guild_id)
-                await self._update_current_board(guild_id, new_move)
+                self._next_player(guild_id, skip=True)
+            await self._update_current_board(guild_id, self._current_move[guild_id])
+
         else:
             self._current_move[guild_id] = new_move
             self._next_player(guild_id)
-            await self._update_current_board(guild_id, new_move)
+            await self._update_current_board(guild_id, self._current_move[guild_id])
+
+
+
 
     async def start_play(self, ctx):
         guild_id = ctx.guild.id
@@ -309,97 +319,99 @@ class TienLen(commands.Cog):
             # TODO endgame
             pass
 
-    async def _send_board_to_user(self, guild_id, *players):
-        for player in players:
-            user_name = player.display_name
-            create_user_board(guild_id, user_name, *self._player_cards[guild_id][player])
-            guild = self.client.get_guild(856771318741205003)
-            channel_target = discord.utils.find(lambda x: x.name == '2', guild.text_channels)
-            _msg = await channel_target.send(
-                file=discord.File(f'cogs/GameAPI/playing_guild/{guild_id}/{user_name}.png'))
-            embed = discord.Embed(title="Your cards:")
-            embed.set_image(url=_msg.attachments[0].url)
-            embed.set_footer(text="Choose cards you want to pick")
-            cards = self._player_cards[guild_id][player]
-            lis = [create_button(style=ButtonStyle.blue, label=f"{card}", custom_id=f"{card}") for card in cards]
-            action_row = spread_to_rows(*lis) + [
-                create_actionrow(create_button(style=ButtonStyle.gray, label="Send", custom_id="Send"),
-                                 create_button(style=ButtonStyle.red, label="Skip", custom_id="Skip"))]
-            await self._msg_playing_player[guild_id][player].send(embed=embed, components=action_row, hidden=True)
-            cards_picked = []
-            while True:
-                button_ctx: ComponentContext = await wait_for_component(self.client, components=action_row,
-                                                                        check=lambda e: e.author == player and e.guild == player.guild)
-                if self._check_end_game(guild_id):
-                    embed = discord.Embed(title="Game Over")
-                    action_row_ = create_actionrow(
-                        create_button(style=ButtonStyle.red, label="Exit", custom_id="Exit", disabled=True))
-                    await button_ctx.edit_origin(content="Did you try your best?", embed=embed,
-                                                 components=[action_row_])
+    async def _send_board_to_user(self, guild_id, player):
+        user_name = player.display_name
+        create_user_board(guild_id, user_name, *self._player_cards[guild_id][player])
+        guild = self.client.get_guild(856771318741205003)
+        channel_target = discord.utils.find(lambda x: x.name == '2', guild.text_channels)
+        _msg = await channel_target.send(
+            file=discord.File(f'cogs/GameAPI/playing_guild/{guild_id}/{user_name}.png'))
+        embed = discord.Embed(title="Your cards:")
+        embed.set_image(url=_msg.attachments[0].url)
+        embed.set_footer(text="Choose cards you want to pick")
+        cards = self._player_cards[guild_id][player]
+        lis = [create_button(style=ButtonStyle.blue, label=f"{card}", custom_id=f"{card}") for card in cards]
+        action_row = spread_to_rows(*lis) + [
+            create_actionrow(create_button(style=ButtonStyle.gray, label="Send", custom_id="Send"),
+                             create_button(style=ButtonStyle.red, label="Skip", custom_id="Skip"))]
+        await self._msg_playing_player[guild_id][player].send(embed=embed, components=action_row, hidden=True)
+        cards_picked = []
+        while True:
+            button_ctx: ComponentContext = await wait_for_component(self.client, components=action_row,
+                                                                    check=lambda
+                                                                        e: e.author == player and e.guild == player.guild)
+            if self._check_end_game(guild_id):
+                embed = discord.Embed(title="Game Over")
+                action_row_ = create_actionrow(
+                    create_button(style=ButtonStyle.red, label="Exit", custom_id="Exit", disabled=True))
+                await button_ctx.edit_origin(content="Did you try your best?", embed=embed,
+                                             components=[action_row_])
 
-                elif button_ctx.custom_id == "Send":
-                    if player != self._cycle_playing[guild_id][self._current_player[guild_id]]:
-                        await button_ctx.edit_origin(content="Waiting for your turn, please!", embed=embed,
-                                                     components=action_row, hidden=True)
-                    elif self._check_valid_move(self._player_cards[guild_id][player],
-                                                self._current_move[guild_id], cards_picked):
-                        self._player_cards[guild_id][player] = [card for card in
-                                                                self._player_cards[guild_id][player] if
-                                                                card not in cards_picked]
-                        temp = self._check_finished_player(guild_id)
-                        await self._next_state(guild_id, cards_picked)
-                        if temp:
-                            action_row_ = create_actionrow(
-                                create_button(style=ButtonStyle.red, label="Exit", custom_id="Exit", disabled=True))
-                            await button_ctx.edit_origin(
-                                content=":sunglasses:",
-                                embed=discord.Embed(
-                                    description=f"Your rank: {self._player_finished_playing[guild_id].index(player) + 1}"),
-                                components=[action_row_]
-                            )
-                            break
-                        else:
-                            create_user_board(guild_id, user_name, *self._player_cards[guild_id][player])
-                            _msg = await channel_target.send(
-                                file=discord.File(f'cogs/GameAPI/playing_guild/{guild_id}/{user_name}.png'))
-                            embed.set_image(url=_msg.attachments[0].url)
-                            embed.set_footer(text="Choose cards you want to pick")
-                            cards = self._player_cards[guild_id][player]
-                            lis = [create_button(style=ButtonStyle.blue, label=f"{card}", custom_id=f"{card}") for card
-                                   in
-                                   cards]
+            elif button_ctx.custom_id == "Send":
 
-                            action_row = (spread_to_rows(*lis) if lis else []) + [
-                                create_actionrow(create_button(style=ButtonStyle.gray, label="Send", custom_id="Send"),
-                                                 create_button(style=ButtonStyle.red, label="Skip", custom_id="Skip"))]
-                            cards_picked = []
-                            await button_ctx.edit_origin(content="You chose:", embed=embed, components=action_row,
-                                                         hidden=True)
-
+                if player != self._cycle_playing[guild_id][self._current_player[guild_id]]:
+                    await button_ctx.edit_origin(content="Waiting for your turn, please!", embed=embed,
+                                                 components=action_row, hidden=True)
+                elif self._check_valid_move(self._player_cards[guild_id][player],
+                                            self._current_move[guild_id], cards_picked):
+                    self._player_cards[guild_id][player] = [card for card in
+                                                            self._player_cards[guild_id][player] if
+                                                            card not in cards_picked]
+                    temp = self._check_finished_player(guild_id,player)
+                    await self._next_state(guild_id, cards_picked)
+                    if temp:
+                        action_row_ = create_actionrow(
+                            create_button(style=ButtonStyle.red, label="Exit", custom_id="Exit", disabled=True))
+                        await button_ctx.edit_origin(
+                            content=":sunglasses:",
+                            embed=discord.Embed(
+                                description=f"Your rank: {self._player_finished_playing[guild_id].index(player) + 1}"),
+                            components=[action_row_]
+                        )
+                        break
                     else:
-                        await button_ctx.edit_origin(content="Invalid moving", embed=embed,
-                                                     components=action_row, hidden=True)
-                elif button_ctx.custom_id == "Skip":
-                    if player not in self._cycle_playing[guild_id]:
-                        await button_ctx.edit_origin(content="Skipped", embed=embed,
-                                                     components=action_row, hidden=True)
-                    else:
-                        self._cycle_playing[guild_id].remove(player)
-                        await self._next_state(guild_id)
-                        await button_ctx.edit_origin(content="Skipped", embed=embed,
-                                                     components=action_row, hidden=True)
+                        create_user_board(guild_id, user_name, *self._player_cards[guild_id][player])
+                        _msg = await channel_target.send(
+                            file=discord.File(f'cogs/GameAPI/playing_guild/{guild_id}/{user_name}.png'))
+                        embed.set_image(url=_msg.attachments[0].url)
+                        embed.set_footer(text="Choose cards you want to pick")
+                        cards = self._player_cards[guild_id][player]
+                        lis = [create_button(style=ButtonStyle.blue, label=f"{card}", custom_id=f"{card}") for card
+                               in
+                               cards]
+
+                        action_row = (spread_to_rows(*lis) if lis else []) + [
+                            create_actionrow(create_button(style=ButtonStyle.gray, label="Send", custom_id="Send"),
+                                             create_button(style=ButtonStyle.red, label="Skip", custom_id="Skip"))]
+                        cards_picked = []
+                        await button_ctx.edit_origin(content="You chose:", embed=embed, components=action_row,
+                                                     hidden=True)
 
                 else:
-                    if button_ctx.custom_id not in cards_picked:
-                        cards_picked.append(button_ctx.custom_id)
-                        await button_ctx.edit_origin(
-                            content="You chose:\n" + ", ".join(f"{card}" for card in cards_picked), embed=embed,
-                            components=action_row, hidden=True)
-                    else:
-                        cards_picked.remove(button_ctx.custom_id)
-                        await button_ctx.edit_origin(
-                            content="You chose:\n" + "".join(f"{card}" for card in cards_picked), embed=embed,
-                            components=action_row, hidden=True)
+                    await button_ctx.edit_origin(content="Invalid moving:\n" + ", ".join(f"{card}" for card in cards_picked), embed=embed,
+                                                 components=action_row, hidden=True)
+            elif button_ctx.custom_id == "Skip":
+                if player not in self._cycle_playing[guild_id]:
+                    await button_ctx.edit_origin(content="Skipped\n" + ", ".join(f"{card}" for card in cards_picked), embed=embed,
+                                                 components=action_row, hidden=True)
+                else:
+                    self._cycle_playing[guild_id].remove(player)
+                    await self._next_state(guild_id)
+                    await button_ctx.edit_origin(content="Skipped:\n" + ", ".join(f"{card}" for card in cards_picked), embed=embed,
+                                                 components=action_row,
+                                                 hidden=True)
+
+            else:
+                if button_ctx.custom_id not in cards_picked:
+                    cards_picked.append(button_ctx.custom_id)
+                    await button_ctx.edit_origin(
+                        content="You chose:\n" + ", ".join(f"{card}" for card in cards_picked), embed=embed,
+                        components=action_row, hidden=True)
+                else:
+                    cards_picked.remove(button_ctx.custom_id)
+                    await button_ctx.edit_origin(
+                        content="You chose:\n" + ", ".join(f"{card}" for card in cards_picked), embed=embed,
+                        components=action_row, hidden=True)
 
     @cog_ext.cog_slash(name="tienlen", description="Play a card game", options=[
         create_option(
@@ -437,7 +449,8 @@ class TienLen(commands.Cog):
             self._msg_playing_player[ctx.guild.id] = {}
             self._msg_playing_player[ctx.guild.id][ctx.author] = ctx
             while True:
-                button_ctx: ComponentContext = await wait_for_component(self.client, components=[action_row],check=lambda e:e.guild == ctx.guild)
+                button_ctx: ComponentContext = await wait_for_component(self.client, components=[action_row],
+                                                                        check=lambda e: e.guild == ctx.guild)
                 if button_ctx.custom_id == "Start":
                     self._force_stop[ctx.guild.id] = False
                     await self._msg_main_playing[ctx.guild.id].delete()
@@ -482,7 +495,7 @@ class TienLen(commands.Cog):
             await self._send_board_to_user(ctx.guild.id, ctx.author)
 
     @commands.command(name="destroy_card_game")
-    async def destroy_card_game(self,ctx):
+    async def destroy_card_game(self, ctx):
         await ctx.message.delete()
         if not self._playing_status[ctx.guild.id]:
             await ctx.send(content="The game haven't started")
@@ -495,8 +508,6 @@ class TienLen(commands.Cog):
                 embed=discord.Embed(description="Game Over")
             )
             self._playing_status[ctx.guild.id] = False
-
-
 
 
 def setup(client):
