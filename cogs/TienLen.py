@@ -2,6 +2,8 @@ import asyncio
 import numpy as np
 import random
 import re
+import time
+import threading
 import discord
 from unidecode import unidecode
 from discord.ext import commands
