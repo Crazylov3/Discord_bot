@@ -139,7 +139,7 @@ class TienLen(commands.Cog):
                 return 6, len(unique)
         return None
     def create_time_count(self,guild_id):
-        count = 60
+        count = 45
         while count > 0:
             count -= 1
             if self._time_out[guild_id]:
