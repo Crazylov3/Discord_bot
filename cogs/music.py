@@ -14,8 +14,8 @@ from discord_slash.utils.manage_components import create_button, create_actionro
 from youtube_dl import YoutubeDL
 
 URL_REGEX = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))"
-YDL_OPTIONS = {"format": "bestaudio/best", "restrictfilenames": True, "noplaylist": True,
-                                   "nocheckcertificate": True, "ignoreerrors": True, "logtostderr": False,
+YDL_OPTIONS = {"format": "bestaudio/best","noplaylist": True,
+                                   "nocheckcertificate": True, "ignoreerrors": True, 
                                    "quiet": True, "no_warnings": True,
                                    }
 
@@ -374,7 +374,7 @@ class Music(commands.Cog):
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 _info = ydl.extract_info(f"ytsearch5:{input}", download=False)
                 choose_song = True
-                if _info:
+                if _info is not None:
                     info = await self.choose_song(ctx, _info)
                 else:
                     await ctx.send("Query error, try again!")
@@ -391,8 +391,8 @@ class Music(commands.Cog):
 
         number_song = 1
         if check_playlist(input):
-            YDL_OPTIONS_playlist = {"format": "bestaudio/best", "restrictfilenames": True,
-                           "nocheckcertificate": True, "ignoreerrors": True, "logtostderr": False,
+            YDL_OPTIONS_playlist = {"format": "bestaudio/best", 
+                           "nocheckcertificate": True, "ignoreerrors": True,
                            "quiet": True, "no_warnings": True,
                            }
             with YoutubeDL(YDL_OPTIONS_playlist) as ydl:
