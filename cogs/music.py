@@ -369,6 +369,9 @@ class Music(commands.Cog):
         if re.match(URL_REGEX, input):
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 info = ydl.extract_info(input, download=False)
+                if info is None:
+                  await ctx.send("Query error, try again!")
+                  return
 
         else:
             with YoutubeDL(YDL_OPTIONS) as ydl:
@@ -379,7 +382,7 @@ class Music(commands.Cog):
                 else:
                     await ctx.send("Query error, try again!")
                     return 
-
+        
         simple_info = get_simple_info(info)
         self.queue.add(ctx.guild.id, simple_info)
 
