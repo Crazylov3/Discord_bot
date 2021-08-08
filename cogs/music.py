@@ -17,7 +17,6 @@ URL_REGEX = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^
 YDL_OPTIONS = {"format": "bestaudio/best", "restrictfilenames": True, "noplaylist": True,
                                    "nocheckcertificate": True, "ignoreerrors": True, "logtostderr": False,
                                    "quiet": True, "no_warnings": True,
-                                   "source_address": "0.0.0.0"
                                    }
 
 class AlreadyConnectedToChannel(commands.CommandError):
@@ -375,7 +374,11 @@ class Music(commands.Cog):
             with YoutubeDL(YDL_OPTIONS) as ydl:
                 _info = ydl.extract_info(f"ytsearch5:{input}", download=False)
                 choose_song = True
-                info = await self.choose_song(ctx, _info)
+                if _info:
+                    info = await self.choose_song(ctx, _info)
+                else:
+                    await ctx.send("Query error, try again!")
+                    return 
 
         simple_info = get_simple_info(info)
         self.queue.add(ctx.guild.id, simple_info)
@@ -391,7 +394,6 @@ class Music(commands.Cog):
             YDL_OPTIONS_playlist = {"format": "bestaudio/best", "restrictfilenames": True,
                            "nocheckcertificate": True, "ignoreerrors": True, "logtostderr": False,
                            "quiet": True, "no_warnings": True,
-                           "source_address": "0.0.0.0"
                            }
             with YoutubeDL(YDL_OPTIONS_playlist) as ydl:
                 playlist_info = ydl.extract_info(input, download=False)
