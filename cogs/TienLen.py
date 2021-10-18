@@ -1,11 +1,7 @@
 import asyncio
 import numpy as np
 import random
-import re
-import time
-import threading
 import discord
-from unidecode import unidecode
 from discord.ext import commands
 from discord_slash import cog_ext
 from discord_slash.model import ButtonStyle
@@ -17,7 +13,7 @@ from cogs.GameAPI.create_board import create_current_board, create_user_board
 list_card = []
 mapping_point = {}
 format = {}
-number_cards = 13
+number_cards = 5
 for i in ['A'] + [f'{i}' for i in range(2, 11)] + ['J', 'Q', 'K']:
     list_card.extend([f"{i} ♧", f"{i} ♡", f"{i} ♤", f"{i} ♢"])
     format[f"{i} co"] = f"{i} ♡"
@@ -55,13 +51,13 @@ for i in ['A'] + [f'{i}' for i in range(2, 11)] + ['J', 'Q', 'K']:
         mapping_point[f"{i} ♢"] = 15.3
         mapping_point[f"{i} ♤"] = 15.1
 
-
-
 def _sort(arr):
     return sorted(arr, key=lambda x: (
         x.split(" ")[0] != "A", x.split(" ")[0] == "K", not x.split(" ")[0].isdigit(), x.split(" ")[0] == "10",
         x.split(" ")[0], x.split(" ")[1] != "♤", x.split(" ")[1] != "♧", x.split(" ")[1] != "♢",
         x.split(" ")[1] != "♡"))
+
+
 
 
 class TienLen(commands.Cog):
@@ -84,7 +80,6 @@ class TienLen(commands.Cog):
         self._current_move = {}
         self._player_finished_playing = {}
         self._type_of_cycle = {}
-        self._time_out = {}
         self._waiting_for_player_event = {}
         for guild_id in self.guilds:
             if guild_id not in self._playing_status.keys():
@@ -101,6 +96,8 @@ class TienLen(commands.Cog):
             self._players_joined[guild.id] = []
             self._number_player[guild.id] = 0
             self.guilds.append(guild.id)
+
+
 
     @staticmethod
     def _get_point(args):
@@ -138,15 +135,6 @@ class TienLen(commands.Cog):
             elif list(unique) == list(range(min(unique), max(unique) + 1)) and (count == 2).sum() == len(count):
                 return 6, len(unique)
         return None
-    def create_time_count(self,guild_id):
-        count = 45
-        while count > 0:
-            count -= 1
-            if self._time_out[guild_id]:
-                return
-            time.sleep(1)
-        coro_ = self._next_state(guild_id,skipped=self._cycle_playing[guild_id][0][self._current_player[guild_id]])
-        fut_ = asyncio.run_coroutine_threadsafe(coro_, self.client.loop)
 
     def _create_cycle_playing(self, guild_id, initial_moving=None, player_start_cycle=None, type=0):
         self._current_move[guild_id] = initial_moving
@@ -275,11 +263,10 @@ class TienLen(commands.Cog):
         embed.set_footer(text="Use `/show_your_card` to see your card.")
         await self._msg_main_playing[guild_id].edit(content="The game has started", embed=embed)
 
-    async def _next_state(self, guild_id, new_move=None, skipped=None, finished=None):      
+    async def _next_state(self, guild_id, new_move=None, skipped=None, finished=None):
+
         self._total_number_moving[guild_id] += 1
-        self._time_out[guild_id] = True
-        self._waiting_for_player_event[guild_id] = threading.Thread(target=self.create_time_count,
-                                                                    args=[guild_id])
+
         if self._check_end_game(guild_id):
             self._playing_status[guild_id] = False
             self._lobby_status[guild_id] = False
@@ -300,18 +287,15 @@ class TienLen(commands.Cog):
                     self._create_cycle_playing(guild_id, player_start_cycle=self._player_start_cycle[guild_id])
                 else:
                     self._next_player(guild_id, skip=True)
-            await self._update_current_board(guild_id, self._current_move[guild_id])
-
         elif finished:
             index = self._origin_cycle_playing[guild_id].index(finished)
             if index >= len(self._origin_cycle_playing[guild_id]) - 1:
                 player_start_cycle = self._origin_cycle_playing[guild_id][0]
             else:
-                player_start_cycle = self._origin_cycle_playing[guild_id][index+1]
+                player_start_cycle = self._origin_cycle_playing[guild_id][index + 1]
 
             self._origin_cycle_playing[guild_id].remove(finished)
             self._create_cycle_playing(guild_id, initial_moving=new_move, player_start_cycle=player_start_cycle, type=1)
-            await self._update_current_board(guild_id, self._current_move[guild_id])
 
         else:
             if self._cycle_playing[guild_id][1] == 1:
@@ -322,12 +306,10 @@ class TienLen(commands.Cog):
             else:
                 self._current_move[guild_id] = new_move
                 self._next_player(guild_id)
-            await self._update_current_board(guild_id, self._current_move[guild_id])
-            
-        self._time_out[guild_id] = False
-        time.sleep(1)
-        self._waiting_for_player_event[guild_id].start()
-        
+        await self._update_current_board(guild_id, self._current_move[guild_id])
+
+
+
     async def start_play(self, ctx):
         guild_id = ctx.guild.id
         self._playing_status[guild_id] = True
