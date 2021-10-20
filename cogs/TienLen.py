@@ -13,7 +13,7 @@ from cogs.GameAPI.create_board import create_current_board, create_user_board
 list_card = []
 mapping_point = {}
 format = {}
-number_cards = 5
+number_cards = 13
 for i in ['A'] + [f'{i}' for i in range(2, 11)] + ['J', 'Q', 'K']:
     list_card.extend([f"{i} ♧", f"{i} ♡", f"{i} ♤", f"{i} ♢"])
     format[f"{i} co"] = f"{i} ♡"
