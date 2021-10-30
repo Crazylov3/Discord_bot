@@ -4,10 +4,9 @@ from discord_slash import SlashCommand
 import discord
 from discord.ext import commands
 
-
 load_dotenv()
 
-client = commands.Bot(command_prefix=".",activity =discord.Activity(type=discord.ActivityType.listening, name="music"))
+client = commands.Bot(command_prefix=".", activity=discord.Activity(name="Test", type=5))
 slash = SlashCommand(client, sync_commands=True, sync_on_cog_reload=True)
 
 
@@ -19,6 +18,7 @@ async def on_ready():
 
     print("Bot is ready")
 
+
 @client.event
 async def on_message(msg):
     if msg.channel.id == 865092377664028703 and msg.channel.name == "announce":
@@ -27,19 +27,29 @@ async def on_message(msg):
             title = ls[1]
             text = ls[2]
             for guild in client.guilds:
-                general = discord.utils.find(lambda x: x.name.lower() == 'general' or x.name.lower() == 'chung', guild.text_channels)
+                general = discord.utils.find(lambda x: x.name.lower() == 'general' or x.name.lower() == 'chung',
+                                             guild.text_channels)
                 if general and general.permissions_for(guild.me).send_messages:
-                    await general.send(embed=discord.Embed(title=title,description=text))
+                    await general.send(embed=discord.Embed(title=title, description=text))
     else:
         await client.process_commands(msg)
 
+
+@client.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.reply("Please pass in all required arguments.", delete_after=60, mention_author=False)
+    elif isinstance(error, commands.MissingPermissions):
+        await ctx.reply("You do not have permission to execute this command.", delete_after=60, mention_author=False)
+    elif isinstance(error, commands.CommandNotFound):
+        await ctx.reply("Unknown command!", delete_after=60, mention_author=False)
+    else:
+        print(error)
 
 
 @client.command()
 async def ping(ctx):
     await ctx.reply(f"Ping: {round(client.latency * 1000)} ms", mention_author=False)
-
-
 
 
 @client.command()
@@ -62,4 +72,4 @@ for filename in os.listdir("cogs"):
     if filename.endswith(".py"):
         client.load_extension(f"cogs.{filename[:-3]}")
 
-client.run(os.getenv("TOKEN"))
+client.run("ODYwNzM1MTQ1MjcwMDUwODE2.YN_kEg.6_lpvCxOmHdlkC0WAs-S9mdj_pE")
