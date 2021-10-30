@@ -16,3 +16,4 @@ unidecode
 statistics
 requests
 pygame
+aiohttp
