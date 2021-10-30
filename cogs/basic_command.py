@@ -6,6 +6,8 @@ from statistics import mode
 import json
 import requests
 from datetime import datetime
+import aiohttp
+import io
 
 
 def text_city_preprocess(text):
@@ -46,9 +48,11 @@ def weather_get_info(content):
 class Basic_command(commands.Cog):
     def __init__(self, client):
         self.client = client
+
     @commands.command()
-    async def clear(self,ctx,amount=50):
-        await ctx.channel.purge(limit = amount)
+    @commands.has_permissions(manage_messages=True)
+    async def clear(self, ctx, amount=50):
+        await ctx.channel.purge(limit=amount)
 
     @commands.command()
     async def girl(self, ctx):
@@ -56,13 +60,26 @@ class Basic_command(commands.Cog):
             while True:
                 try:
                     id = np.random.randint(0, 1378)
-                    embed = discord.Embed(title="Gái ...🤤", colour=ctx.guild.me.colour)
+                    embed = discord.Embed(title="🤤", colour=ctx.guild.me.colour)
                     embed.set_image(
                         url=f"https://raw.githubusercontent.com/Crazylov3/Photo-Libary/main/Photos/{id}.png")
                     await ctx.send(embed=embed)
                     break
                 except:
                     pass
+
+    @commands.command(aliases=["gan"])
+    async def GAN(self, ctx):
+        async with ctx.channel.typing():
+            async with aiohttp.ClientSession() as cs:
+                async with cs.get('https://thispersondoesnotexist.com/image') as resp:
+                    embed = discord.Embed(title="Random image with GAN")
+                    if resp.status != 200:
+                        return await ctx.send(embed=discord.Embed(title="Ops! Try again."))
+                    data = io.BytesIO(await resp.read())
+                    file = discord.File(data, 'image.png')
+                    embed.set_image(url="attachment://image.png")
+                    await ctx.send(embed=embed, file=file)
 
     @commands.command()
     async def weather(self, ctx, *, city: str):
@@ -84,7 +101,7 @@ class Basic_command(commands.Cog):
                     )
                     for day in info:
                         embed.add_field(name=f"{day['daytime']}",
-                                        value=f" Weather: {day['weather_des']}\nTemperature: {day['temp']}°C ({day['temp_min']}°C - {day['temp_max']}°C)" 
+                                        value=f" Weather: {day['weather_des']}\nTemperature: {day['temp']}°C ({day['temp_min']}°C - {day['temp_max']}°C)"
                                               f"\nHumidity: {day['humidity']}%"
                                               f"\nWind speed: {day['wind_speed']} m/s  " + "|" + f"  Wind gust: {day['wind_gust']} m/s",
                                         inline=False
