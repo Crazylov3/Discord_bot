@@ -13,5 +13,8 @@ Special feature:
   + Tictactoe game (vs Bot, supported by minmax algorithm)
   + Send a random girl image 😎
   + Send a random image with GAN (https://thispersondoesnotexist.com)
-  + Weather forecast
+  + Weather forecast 
   + Some other basic function
+
+* Prefix: "."
+* Type .help if you need help
